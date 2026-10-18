@@ -2,7 +2,6 @@
 
 A multi-game collection for the [Adafruit PyGamer](https://www.adafruit.com/product/4242) (SAMD51 / ATSAMD51J19). It started as a first-person portal puzzle game rendered with a grid raycaster and grew into **Arcadia**: a game picker with 64 built-in games plus expansion cartridges, a settings menu, high scores, achievements, and support for extra content loaded from the board's USB drive.
 
-
 ## Features
 
 - **Portal**: Wolfenstein-style raycaster puzzle game. Fire linked portals, push boxes, dodge lasers, ride ice and use pressure plates. There are 52 hand-made levels plus about 1000 generated mazes.
