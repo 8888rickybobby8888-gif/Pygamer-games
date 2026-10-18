@@ -10,7 +10,7 @@ What it is
   Older games with their own hand-built title screens (and Mastermind, Checkers, Chess) keep their look.
 
 Generate it (PC, any OS with Python 3)
-  cd PyGamerPortal\tools
+  cd tools
   python make_assets.py
   -> out\banners.bin (56 banners, 229,384 bytes) and out\preview.png (contact sheet)
   Pillow (pip install pillow) gives nicer text; without it a built-in pixel font is used. Game names

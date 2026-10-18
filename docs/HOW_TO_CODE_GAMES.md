@@ -94,7 +94,7 @@ python make_carts.py --shots         # also writes rough screenshots to tools/ou
 `make_carts.py` writes `.arc` files to `tools/out/carts/`. To put them on the board:
 
 1. On the PyGamer, open **Settings → USB drive**.
-2. Run `powershell -ExecutionPolicy Bypass -File tools/install_assets.ps1 -Carts`. Add `-Drive E:` if the drive isn't detected.
+2. Run `python tools/install_assets.py --carts`. Add `--drive PATH` if the drive isn't detected. On Windows, `tools/install_assets.ps1 -Carts` does the same.
 3. Eject the drive, then press **B** on the PyGamer. It reboots and rescans `/carts`.
 
 The firmware lists at most 16 cartridges, and each one should stay under about 4.5 KB.

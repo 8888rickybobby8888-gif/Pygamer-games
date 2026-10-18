@@ -55,14 +55,14 @@ Double-tap reset if the board doesn't show up in `arduino-cli board list`.
 | `sketch.yaml` | Default board (FQBN) and USB stack |
 | `gen_levels.js` | Seeded generator for Portal levels. Run with `node gen_levels.js`. |
 | `gen_textures.js` | Bakes the raycaster textures into 16x16 bitmap tables. Run with `node gen_textures.js`. |
-| `level_editor.html`, `level_editor_server.js`, `launch_level_editor.bat` | Portal level editor. The local server splices levels into the sketch and drives `arduino-cli`. On Windows, run the `.bat`. Elsewhere, run `node level_editor_server.js` and open <http://localhost:8787>. |
+| `level_editor.html`, `level_editor_server.js`, `launch_level_editor.bat`, `launch_level_editor.sh` | Portal level editor. The local server splices levels into the sketch and drives `arduino-cli`. On Windows, run `launch_level_editor.bat`. On macOS and Linux, run `./launch_level_editor.sh`. |
 | `docs/HOW_TO_CODE_GAMES.md` | Guide to writing games |
 | `TEST_CHECKLIST.md` | Hardware test checklist |
 | `tools/` | Python asset builders, cartridge sources and creators (below) |
 
 ## Tools (`tools/`)
 
-Python 3 with no extra packages is enough for most scripts. Pillow is optional and gives nicer banner text. Output goes to `tools/out/`.
+Python 3 with no extra packages is enough for most scripts. Pillow is optional and gives nicer banner text. Output goes to `tools/out/`, which is not tracked in git. Run the scripts to regenerate it.
 
 | Script | Produces |
 | --- | --- |
@@ -73,7 +73,7 @@ Python 3 with no extra packages is enough for most scripts. Pillow is optional a
 | `make_quest_world.py` | `quest.wld` for Portal Quest |
 | `make_words.py` | Word list for Hangman and Wordle |
 | `make_roms.py` | CHIP-8 ROMs |
-| `install_assets.ps1` | Copies built assets to the PyGamer drive (Windows) |
+| `install_assets.py`, `install_assets.ps1` | Copy built assets to the PyGamer drive (cross-platform Python, and the Windows PowerShell original) |
 
 The `tools/` folder has a detailed README for each part: `README_CARTS.txt`, `README_PACKS.txt`, `README_ASSETS.txt`, `README_PORTAL.txt`, `README_QUEST.txt`, `README_WORDS.txt`, `README_CHIP8.txt` and `README_ERRORCODES.txt`.
 
@@ -82,5 +82,5 @@ The `tools/` folder has a detailed README for each part: `README_CARTS.txt`, `RE
 ### Installing assets to the board
 
 1. On the PyGamer, open **Settings → USB drive**. The drive appears on your PC.
-2. Run `powershell -ExecutionPolicy Bypass -File tools/install_assets.ps1` with the switch for what you built (`-Carts`, `-Packs`, `-Portal`, `-Quest`, `-Words`, `-Roms`, `-Levels`, or none for banners). Add `-Drive E:` if auto-detection fails.
+2. Run `python tools/install_assets.py` with the switch for what you built (`--carts`, `--packs`, `--portal`, `--quest`, `--words`, `--roms`, `--levels`, or none for banners). Add `--drive PATH` if auto-detection fails. On Windows, `powershell -ExecutionPolicy Bypass -File tools/install_assets.ps1` takes the same switches in PowerShell style (`-Carts`, `-Drive E:`).
 3. Eject the drive, then press **B** on the PyGamer. It reboots and picks up the new files.
