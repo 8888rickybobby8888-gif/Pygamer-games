@@ -1,0 +1,163 @@
+// SNAKE+ : classic snake with three power-ups.
+//   gold apple  = +3 points and a growth spurt      S = slow motion (6 s)
+//   x2          = double points (8 s)               G = ghost: walls wrap around (6 s)
+@name "SNAKE PLUS"
+@blurb "Arcade: snake + powers"
+@author "Arcadia"
+@version 1
+@color lime
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: steer the snake" "Eat food, avoid walls" "S slow x2 dbl G ghost"
+@icon "..####.."
+      ".#....#."
+      ".#.###.."
+      "..#...#."
+      "...#..#."
+      ".#..#.#."
+      "..####.."
+      "........"
+@sprite apple "...##..."
+              "..#.#..."
+              ".######."
+              "########"
+              "########"
+              "########"
+              ".######."
+              "..#..#.."
+@sprite star  "...##..."
+              "...##..."
+              "########"
+              ".######."
+              "..####.."
+              ".######."
+              ".##..##."
+              ".#....#."
+
+const GW = 20;
+const GH = 14;
+const N = 280;
+const OY = 16;
+array body[280];        // ring buffer of cells (cell = y * 20 + x)
+array occ[280];         // 1 where the snake is
+array baseDelay[4] = {7, 9, 5, 3};
+
+var hi, ti, len, dx, dy, ndx, ndy, food, pup, pupKind, pupLife, tick, delay;
+var slowT, dblT, ghostT, grow, flash, msgT, msgK, base;
+
+func placeFree() {
+  for (var t = 0; t < 80; t++) {
+    var c = rnd(N);
+    if (occ[c] == 0 && c != food && c != pup) return c;
+  }
+  return -1;
+}
+
+func init() {
+  memfill(occ, N, 0);
+  base = baseDelay[tier()];
+  len = 3; ti = 0; hi = 2;
+  for (var i = 0; i < 3; i++) { body[i] = 6 * GW + 4 + i; occ[body[i]] = 1; }
+  dx = 1; dy = 0; ndx = 1; ndy = 0;
+  food = -1; pup = -1; pupLife = 0;
+  food = placeFree();
+  delay = base;
+}
+
+func die() {
+  sfx(3); shake(250, 3); led(255, 0, 0, 200);
+  var h = body[hi];
+  burst((h % GW) * 8 + 4, OY + (h / GW) * 8 + 4, 18, RED);
+  gameover("CRASHED!");
+}
+
+func step() {
+  var h = body[hi];
+  var x = h % GW + dx;
+  var y = h / GW + dy;
+  if (x < 0 || x >= GW || y < 0 || y >= GH) {
+    if (ghostT > 0) { x = (x + GW) % GW; y = (y + GH) % GH; }
+    else { die(); return 0; }
+  }
+  var c = y * GW + x;
+  var tailCell = body[ti];
+  if (occ[c] == 1 && !(c == tailCell && grow == 0)) { die(); return 0; }
+  // advance the head
+  hi = (hi + 1) % N;
+  body[hi] = c;
+  occ[c] = 1;
+  if (grow > 0) { grow--; len++; }
+  else { occ[tailCell] = 0; ti = (ti + 1) % N; }
+  // food
+  if (c == food) {
+    var pts = 1;
+    if (dblT > 0) pts = 2;
+    addscore(pts);
+    grow += 1;
+    sfx(4);
+    burst(x * 8 + 4, OY + y * 8 + 4, 6, YELLOW);
+    food = placeFree();
+    if (rnd(100) < 22 && pup < 0) {
+      pup = placeFree();
+      pupKind = rnd(4);
+      pupLife = 220;
+    }
+    if (delay > 2 && len % 6 == 0) delay--;
+  } else if (c == pup) {
+    sfx(2);
+    burst(x * 8 + 4, OY + y * 8 + 4, 10, CYAN);
+    if (pupKind == 0) { addscore(3 * (dblT > 0 ? 2 : 1)); grow += 3; msgK = 0; }
+    if (pupKind == 1) { slowT = 180; msgK = 1; }
+    if (pupKind == 2) { dblT = 240; msgK = 2; }
+    if (pupKind == 3) { ghostT = 180; msgK = 3; }
+    msgT = 40;
+    pup = -1;
+  }
+}
+
+func frame() {
+  // input (queued direction, no reversing)
+  if (btnp(LEFT)  && dx == 0) { ndx = -1; ndy = 0; }
+  if (btnp(RIGHT) && dx == 0) { ndx = 1;  ndy = 0; }
+  if (btnp(UP)    && dy == 0) { ndx = 0;  ndy = -1; }
+  if (btnp(DOWN)  && dy == 0) { ndx = 0;  ndy = 1; }
+  tick++;
+  var d = delay;
+  if (slowT > 0) d = delay + 4;
+  if (tick >= d) {
+    tick = 0;
+    dx = ndx; dy = ndy;
+    step();
+  }
+  if (slowT > 0) slowT--;
+  if (dblT > 0) dblT--;
+  if (ghostT > 0) ghostT--;
+  if (msgT > 0) msgT--;
+  if (pup >= 0) { pupLife--; if (pupLife <= 0) pup = -1; }
+  flash++;
+
+  // draw
+  cls(BLACK);
+  rect(0, 14, 160, 1, DKGRAY);
+  for (var i = 0; i < len; i++) {
+    var idx = (hi - i + N) % N;
+    var c = body[idx];
+    var col = (i == 0) ? WHITE : ((i & 1) ? GREEN : LIME);
+    if (ghostT > 0 && (flash & 2)) col = CYAN;
+    rect((c % GW) * 8 + 1, OY + (c / GW) * 8 + 1, 6, 6, col);
+  }
+  if (food >= 0) spr((food % GW) * 8, OY + (food / GW) * 8, apple, RED);
+  if (pup >= 0 && (pupLife > 50 || (flash & 4))) {
+    var px = (pup % GW) * 8;
+    var py = OY + (pup / GW) * 8;
+    spr(px, py, star, YELLOW);
+    text(px + 1, py, BLACK, pupKind == 0 ? "$" : (pupKind == 1 ? "S" : (pupKind == 2 ? "2" : "G")));
+  }
+  // HUD
+  text(2, 3, WHITE, "SCORE");
+  num(38, 3, YELLOW, getscore());
+  if (slowT > 0) text(80, 3, CYAN, "SLOW");
+  if (dblT > 0) text(106, 3, ORANGE, "x2");
+  if (ghostT > 0) text(124, 3, PINK, "GHOST");
+  if (msgT > 0) ctext(60, YELLOW, msgK == 0 ? "GOLDEN!" : (msgK == 1 ? "SLOW MOTION" : (msgK == 2 ? "DOUBLE POINTS" : "GHOST MODE")));
+}

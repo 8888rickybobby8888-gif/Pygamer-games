@@ -1,0 +1,195 @@
+// SKY RUNNER : an endless platformer. Hold A to jump higher, tap again for a double jump.
+//   Gaps and spikes end the run; coins score. The world speeds up as you go.
+@name "SKY RUNNER"
+@blurb "Arcade: run & jump"
+@author "Arcadia"
+@version 1
+@color yellow
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "A: jump (hold = higher)" "A again in air: double" "Skip gaps & spikes"
+@icon "..##...."
+      "..##..#."
+      "...#.#.."
+      "..###..."
+      ".#.#...."
+      "...##..."
+      "..#..#.."
+      "########"
+@sprite runner1 "..####.."
+                "..#.##.."
+                "..####.."
+                "..####.."
+                ".######."
+                "#.####.#"
+                "..#..#.."
+                ".##..##."
+@sprite runner2 "..####.."
+                "..#.##.."
+                "..####.."
+                "..####.."
+                ".######."
+                "#.####.#"
+                "...##..."
+                "..#..#.."
+@sprite spike   "........"
+                "........"
+                "...#...."
+                "...#...."
+                "..###..."
+                "..###..."
+                ".#####.."
+                "#######."
+@sprite coin    "..####.."
+                ".#.##.#."
+                "##.##.##"
+                "##.##.##"
+                "##.##.##"
+                "##.##.##"
+                ".#.##.#."
+                "..####.."
+@sprite cloud   "........"
+                "..###..."
+                ".#####.."
+                "#######."
+                "........"
+                "........"
+                "........"
+                "........"
+
+const NCOL = 24;
+array topRow[24];            // ground top (y in tiles) per column, 0 = gap
+array item[24];              // 0 none, 1 coin, 2 spike
+array baseSpeed[4] = {16, 12, 20, 26};   // 1/8 px per frame at the start
+
+var scroll, gen, lastTop, gapLeft, y8, vy8, onGround, jumps, speed8, flash, tick, dist, runFrame, deadT, firstCol;
+
+func init() {
+  lastTop = 10;
+  speed8 = baseSpeed[tier()];
+  for (var i = 0; i < NCOL; i++) { topRow[i] = 10; item[i] = 0; }
+  firstCol = 0;
+  y8 = 88 * 8; vy8 = 0; onGround = 1;
+}
+
+// column slot of absolute column number n
+func slot(n) { return n % NCOL; }
+
+func genColumn(n) {
+  var s = slot(n);
+  item[s] = 0;
+  if (gapLeft > 0) { gapLeft--; topRow[s] = 0; return 0; }
+  if (n < 14) { topRow[s] = 10; return 0; }
+  var r = rnd(100);
+  var diff = 14 + dist / 800;
+  if (diff > 40) diff = 40;
+  if (r < diff && gapLeft == 0) {            // start a gap (1-3 wide)
+    gapLeft = 1 + rnd(2 + dist / 2500);
+    if (gapLeft > 3) gapLeft = 3;
+    topRow[s] = 0;
+    return 0;
+  }
+  if (r < diff + 18) {                       // a height change
+    var nt = lastTop + rnd(5) - 2;
+    nt = clamp(nt, 6, 12);
+    if (nt < lastTop - 2) nt = lastTop - 2;
+    lastTop = nt;
+  }
+  topRow[s] = lastTop;
+  var q = rnd(100);
+  if (q < 12) item[s] = 1;
+  else if (q < 12 + diff / 2 && n > 16) item[s] = 2;
+}
+
+func die(msg) {
+  if (deadT > 0) return 0;
+  deadT = 1;
+  sfx(3); shake(250, 3); led(255, 0, 0, 200);
+  burst(36, y8 / 8 + 8, 18, ORANGE);
+  gameover(msg);
+}
+
+func groundAt(n) {
+  var s = slot(n);
+  return topRow[s];
+}
+
+func frame() {
+  tick++;
+  // world scroll
+  var sp = speed8 + dist / 120;
+  if (sp > 48) sp = 48;
+  scroll += sp;
+  while (scroll >= 64) {
+    scroll -= 64;
+    firstCol++;
+    genColumn(firstCol + NCOL - 1);
+  }
+  dist += sp / 8;
+  if (tick % 6 == 0) addscore(1);
+
+  // the column under the runner (player screen x = 32..40)
+  var offs = scroll / 8;
+  var colL = firstCol + (32 + offs) / 8;
+  var colR = firstCol + (39 + offs) / 8;
+  var gl = groundAt(colL);
+  var gr = groundAt(colR);
+  var gtop = 999;
+  if (gl > 0) gtop = gl * 8 + 16;
+  if (gr > 0 && gr * 8 + 16 < gtop) gtop = gr * 8 + 16;
+  var gtopL = gl > 0 ? gl * 8 + 16 : 999;
+  var gtopR = gr > 0 ? gr * 8 + 16 : 999;
+  var feet = (y8 + 64) / 8;
+
+  // jump
+  if (btnp(A) && jumps < 2) {
+    vy8 = jumps == 0 ? -62 : -52;
+    jumps++; onGround = 0; sfx(7);
+  }
+  if (!btn(A) && vy8 < -22) vy8 = -22;       // short hop when released early
+  vy8 += 5;
+  y8 += vy8;
+  feet = (y8 + 64) / 8;
+  onGround = 0;
+  if (vy8 >= 0 && feet >= gtop && feet - (vy8 / 8) - 2 <= gtop) {
+    y8 = (gtop - 8) * 8; vy8 = 0; onGround = 1; jumps = 0;
+  } else if (gtop < 999 && feet > gtop + 3 && vy8 >= 0) {
+    // ran into the side of a higher block
+    die("CRASHED!");
+  }
+  if (feet > 150) die("FELL!");
+
+  // items under the runner
+  for (var k = 0; k < 2; k++) {
+    var n = k ? colR : colL;
+    var s = slot(n);
+    var gx = (n - firstCol) * 8 - offs;
+    var iy = topRow[s] * 8 + 16;
+    if (item[s] == 1 && hit(32, y8 / 8, 8, 8, gx, iy - 10, 8, 8)) { item[s] = 0; addscore(10); sfx(4); burst(36, iy - 6, 6, YELLOW); }
+    if (item[s] == 2 && hit(33, y8 / 8, 6, 8, gx + 1, iy - 6, 6, 6)) die("SPIKED!");
+  }
+  flash++;
+
+  cls(NAVY);
+  spr((tick / 2) % 190 - 20, 24, cloud, WHITE);
+  spr((tick / 3 + 90) % 190 - 20, 40, cloud, GRAY);
+  for (var i = 0; i < 21; i++) {
+    var n2 = firstCol + i;
+    var s2 = slot(n2);
+    var t = topRow[s2];
+    var x = i * 8 - offs;
+    if (t > 0) {
+      var y = t * 8 + 16;
+      rect(x, y, 8, 128 - y, BROWN);
+      rect(x, y, 8, 3, GREEN);
+      if ((n2 & 1) == 0) rect(x + 2, y + 6, 3, 2, ORANGE);
+      if (item[s2] == 1) spr(x, y - 10, coin, YELLOW);
+      if (item[s2] == 2) spr(x, y - 8, spike, WHITE);
+    }
+  }
+  if (deadT == 0) spr(32, y8 / 8, ((tick / 3) & 1) ? runner1 : runner2, WHITE);
+  text(2, 2, WHITE, "SCORE");
+  num(38, 2, YELLOW, getscore());
+  text(100, 2, WHITE, "DIST");
+  num(128, 2, CYAN, dist / 10);
+}

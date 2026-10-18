@@ -1,0 +1,153 @@
+// METEOR DODGE : weave through a growing meteor storm, grab the coins.
+@name "METEOR DODGE"
+@blurb "Reflex: weave & collect"
+@author "Arcadia"
+@version 1
+@color cyan
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: fly the ship" "Dodge rocks, grab coins" "Shield absorbs one hit"
+@icon "...##..."
+      "..####.."
+      "...##..."
+      ".#....#."
+      "..#..#.."
+      "...##..."
+      "..#..#.."
+      ".#....#."
+@sprite ship  "...##..."
+              "...##..."
+              "..####.."
+              ".######."
+              "########"
+              "##.##.##"
+              "#..##..#"
+              "........"
+@sprite rock  "..####.."
+              ".######."
+              "########"
+              "########"
+              "########"
+              "########"
+              ".######."
+              "..####.."
+@sprite coin  "..####.."
+              ".#....#."
+              "#..##..#"
+              "#.#..#.#"
+              "#.#..#.#"
+              "#..##..#"
+              ".#....#."
+              "..####.."
+@sprite shld  "..####.."
+              ".######."
+              "###..###"
+              "##....##"
+              "##....##"
+              ".##..##."
+              "..####.."
+              "...##..."
+
+const MAXO = 14;
+array ox[14];
+array oy[14];
+array ovy[14];
+array ok[14];            // 0 none, 1 rock, 2 coin, 3 shield
+array osz[14];           // rock scale: 0 small (8px), 1 big (16px)
+array spawnRate[4] = {34, 44, 24, 16};
+array starX[24];
+array starY[24];
+
+var sx, sy, shield, t, spawnT, flash, speed, deadT, trail;
+
+func init() {
+  sx = 76; sy = 100;
+  for (var i = 0; i < 24; i++) { starX[i] = rnd(160); starY[i] = rnd(128); }
+  spawnT = 30;
+}
+
+func spawn() {
+  for (var i = 0; i < MAXO; i++) {
+    if (ok[i] == 0) {
+      ox[i] = 4 + rnd(144);
+      oy[i] = -16;
+      var r = rnd(100);
+      ok[i] = 1;
+      osz[i] = 0;
+      if (r < 22) ok[i] = 2;
+      else if (r < 26) ok[i] = 3;
+      else if (r < 50) osz[i] = 1;
+      ovy[i] = 14 + rnd(10) + speed / 2;      // 1/8 px per frame
+      if (osz[i]) ovy[i] -= 4;
+      return 0;
+    }
+  }
+}
+
+func frame() {
+  t++;
+  speed = t / 200;
+  if (speed > 14) speed = 14;
+  var mv = 3;
+  if (btn(LEFT))  sx -= mv;
+  if (btn(RIGHT)) sx += mv;
+  if (btn(UP))    sy -= mv;
+  if (btn(DOWN))  sy += mv;
+  sx = clamp(sx, 0, 152);
+  sy = clamp(sy, 20, 118);
+  if (t % 10 == 0) addscore(1);
+
+  spawnT--;
+  if (spawnT <= 0) {
+    spawn();
+    spawnT = spawnRate[tier()] - speed * 2 + rnd(10);
+    if (spawnT < 5) spawnT = 5;
+  }
+  for (var i = 0; i < MAXO; i++) {
+    if (ok[i]) {
+      oy[i] += ovy[i] / 8 + 1;
+      if (oy[i] > 130) ok[i] = 0;
+      else {
+        var w = (ok[i] == 1 && osz[i]) ? 14 : 7;
+        if (ok[i] == 1 && osz[i]) { ox[i] = ox[i]; }
+        if (hit(sx + 1, sy + 1, 6, 6, ox[i], oy[i], w, w)) {
+          if (ok[i] == 2) { addscore(25); sfx(4); burst(ox[i] + 4, oy[i] + 4, 8, YELLOW); ok[i] = 0; }
+          else if (ok[i] == 3) { shield = 1; sfx(2); burst(ox[i] + 4, oy[i] + 4, 8, CYAN); ok[i] = 0; }
+          else if (flash == 0) {
+            if (shield) { shield = 0; flash = 30; sfx(6); shake(150, 2); burst(sx + 4, sy + 4, 10, CYAN); ok[i] = 0; }
+            else {
+              sfx(3); shake(300, 4); led(255, 40, 0, 250); burst(sx + 4, sy + 4, 22, ORANGE);
+              gameover("CRASHED!");
+            }
+          }
+        }
+      }
+    }
+  }
+  if (flash > 0) flash--;
+  trail++;
+
+  cls(BLACK);
+  for (var i = 0; i < 24; i++) {
+    starY[i] += 1 + (i & 3);
+    if (starY[i] > 127) { starY[i] = 0; starX[i] = rnd(160); }
+    pix(starX[i], starY[i], (i & 3) > 1 ? GRAY : DKGRAY);
+  }
+  for (var i = 0; i < MAXO; i++) {
+    if (ok[i] == 1) {
+      if (osz[i]) { sprf(ox[i], oy[i], rock, BROWN, 4); }
+      else spr(ox[i], oy[i], rock, GRAY);
+    }
+    if (ok[i] == 2) spr(ox[i], oy[i], coin, YELLOW);
+    if (ok[i] == 3) spr(ox[i], oy[i], shld, CYAN);
+  }
+  if (flash == 0 || (flash & 2)) {
+    spr(sx, sy, ship, WHITE);
+    if (trail & 2) rect(sx + 3, sy + 8, 2, 3, ORANGE); else rect(sx + 3, sy + 8, 2, 2, YELLOW);
+    if (shield) circ(sx + 4, sy + 4, 8, CYAN);
+  }
+  text(2, 2, WHITE, "SCORE");
+  num(38, 2, YELLOW, getscore());
+  text(104, 2, WHITE, "SPD");
+  num(128, 2, ORANGE, speed + 1);
+}

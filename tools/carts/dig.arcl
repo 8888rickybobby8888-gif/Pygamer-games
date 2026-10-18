@@ -1,0 +1,199 @@
+// BOULDER DIG : tunnel through the dirt, grab gems, never stand under a falling rock!
+@name "BOULDER DIG"
+@blurb "Puzzle: dig for gems"
+@author "Arcadia"
+@version 1
+@color orange
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: dig / push rocks" "Collect the gems, then" "reach the flashing door"
+@icon "........"
+      "..####.."
+      ".######."
+      ".######."
+      "..####.."
+      "#.#..#.#"
+      "#.#.##.#"
+      "........"
+@sprite dirt "#.#.#.#."
+             ".#.#.#.#"
+             "#.#.#.#."
+             ".#.#.#.#"
+             "#.#.#.#."
+             ".#.#.#.#"
+             "#.#.#.#."
+             ".#.#.#.#"
+@sprite rock "..####.."
+             ".######."
+             "########"
+             "########"
+             "########"
+             "########"
+             ".######."
+             "..####.."
+@sprite gem  "...##..."
+             "..####.."
+             ".######."
+             "########"
+             ".######."
+             "..####.."
+             "...##..."
+             "........"
+@sprite wall "########"
+             "#.#.#.##"
+             "########"
+             "##.#.#.#"
+             "########"
+             "#.#.#.##"
+             "########"
+             "##.#.#.#"
+@sprite door "########"
+             "#......#"
+             "#.####.#"
+             "#.#..#.#"
+             "#.#..#.#"
+             "#.####.#"
+             "#......#"
+             "########"
+@sprite doorx "########"
+             "#.####.#"
+             "##.##.##"
+             "###..###"
+             "###..###"
+             "##.##.##"
+             "#.####.#"
+             "########"
+@sprite man  "..####.."
+             ".######."
+             "..#..#.."
+             "..####.."
+             ".######."
+             "#.####.#"
+             "..#..#.."
+             ".##..##."
+
+const W = 20;
+const H = 14;
+const DIRT = 65;
+const ROCK = 130;
+const GEM = 195;
+const WALL = 260;
+const DOOR = 325;
+const DOOROPEN = 390;
+array needT[4] = {8, 6, 10, 12};
+array densT[4] = {14, 10, 18, 22};
+array secT[4] = {80, 100, 70, 60};
+array tickT[4] = {5, 6, 4, 3};
+array m[280];
+array fl[280];
+var px, py, gems, need, tleft, lives = 3, level, mt, tk, dead, clear, flash;
+
+func build() {
+  need = needT[tier()] + (level > 3 ? 3 : level);
+  memfill(m, 280, DIRT); memfill(fl, 280, 0);
+  var d = densT[tier()] + level;
+  for (var i = W + 1; i < W * H - W - 1; i++) if (rnd(100) < d) m[i] = ROCK;
+  for (var x = 0; x < W; x++) { m[x] = WALL; m[W * H - 1 - x] = WALL; }
+  for (var y = 0; y < H; y++) { m[y * W] = WALL; m[y * W + W - 1] = WALL; }
+  for (var g = 0; g < need + 4; g++) mset(m, W, H, 1 + rnd(18), 2 + rnd(11), GEM);
+  mset(m, W, H, 1, 1, 0); mset(m, W, H, 2, 1, 0); mset(m, W, H, 1, 2, 0); mset(m, W, H, 2, 2, 0);
+  mset(m, W, H, 18, 12, DOOR);
+  mset(m, W, H, 17, 12, DIRT); mset(m, W, H, 18, 11, DIRT);
+  px = 1; py = 1; gems = 0; dead = 0; clear = 0; mt = 0; tk = 0;
+  tleft = (secT[tier()] - level * 2) * 30;
+}
+
+func init() {
+  setpal(1, BROWN); setpal(2, GRAY); setpal(3, CYAN); setpal(4, DKGRAY); setpal(5, PURPLE); setpal(6, YELLOW);
+  level = 0;
+  build();
+}
+
+func die() {
+  dead = 45; lives--;
+  burst(px * 8 + 4, py * 8 + 20, 20, RED); shake(300, 3); sfx(3); led(255, 0, 0, 300);
+}
+
+func fallpass() {
+  for (var y = H - 2; y >= 1; y--) {
+    for (var x = 1; x < W - 1; x++) {
+      var v = mget(m, W, H, x, y);
+      if (v == ROCK || v == GEM) {
+        var b = mget(m, W, H, x, y + 1);
+        if (x == px && y + 1 == py) {
+          if (mget(fl, W, H, x, y) && !dead) die();
+        } else if (b == 0) {
+          mset(m, W, H, x, y + 1, v); mset(m, W, H, x, y, 0);
+          mset(fl, W, H, x, y + 1, 1); mset(fl, W, H, x, y, 0);
+        } else {
+          if (mget(fl, W, H, x, y)) { tone(120, 10); mset(fl, W, H, x, y, 0); }
+          if (b == ROCK || b == GEM) {
+            if (mget(m, W, H, x - 1, y) == 0 && mget(m, W, H, x - 1, y + 1) == 0 && !(px == x - 1 && py == y)) {
+              mset(m, W, H, x - 1, y, v); mset(m, W, H, x, y, 0); mset(fl, W, H, x - 1, y, 1);
+            } else if (mget(m, W, H, x + 1, y) == 0 && mget(m, W, H, x + 1, y + 1) == 0 && !(px == x + 1 && py == y)) {
+              mset(m, W, H, x + 1, y, v); mset(m, W, H, x, y, 0); mset(fl, W, H, x + 1, y, 1);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+func step(dx, dy) {
+  var nx = px + dx; var ny = py + dy;
+  var v = mget(m, W, H, nx, ny);
+  if (v == 0) { px = nx; py = ny; }
+  else if (v == DIRT) { mset(m, W, H, nx, ny, 0); px = nx; py = ny; tone(200, 6); }
+  else if (v == GEM) {
+    mset(m, W, H, nx, ny, 0); px = nx; py = ny; gems++; addscore(10);
+    sfx(4); burst(nx * 8 + 4, ny * 8 + 20, 8, CYAN);
+  } else if (v == ROCK && dy == 0 && mget(m, W, H, nx + dx, ny) == 0) {
+    mset(m, W, H, nx + dx, ny, ROCK); mset(m, W, H, nx, ny, 0); px = nx; tone(100, 12);
+  } else if (v == DOOROPEN) {
+    clear = 40; addscore(50 + tleft / 30); sfx(2); burst(nx * 8 + 4, ny * 8 + 20, 20, YELLOW); px = nx; py = ny;
+  }
+}
+
+func frame() {
+  flash++;
+  if (dead > 0) {
+    dead--;
+    if (dead == 0) {
+      if (lives <= 0) { gameover("CRUSHED"); return 0; }
+      build();
+    }
+  } else if (clear > 0) {
+    clear--;
+    if (clear == 0) { level++; build(); }
+  } else {
+    tleft--;
+    if (tleft <= 0) { die(); }
+    mt++;
+    if (mt >= 4) {
+      if (btn(LEFT)) { step(-1, 0); mt = 0; }
+      else if (btn(RIGHT)) { step(1, 0); mt = 0; }
+      else if (btn(UP)) { step(0, -1); mt = 0; }
+      else if (btn(DOWN)) { step(0, 1); mt = 0; }
+    }
+    tk++;
+    if (tk >= tickT[tier()]) { tk = 0; fallpass(); }
+    if (gems >= need && mget(m, W, H, 18, 12) == DOOR) { mset(m, W, H, 18, 12, DOOROPEN); sfx(1); }
+  }
+  cls(BLACK);
+  drawmap(m, W, H, 0, 16);
+  if (dead == 0) spr(px * 8, 16 + py * 8, 6, WHITE);
+  rect(0, 0, 160, 16, NAVY);
+  text(2, 1, WHITE, "GEMS");
+  numw(28, 1, CYAN, gems, 2);
+  text(42, 1, WHITE, "/");
+  numw(48, 1, CYAN, need, 2);
+  text(72, 1, WHITE, "TIME");
+  numw(98, 1, (tleft < 450 && (flash & 8)) ? RED : YELLOW, tleft / 30, 3);
+  for (var i = 0; i < lives; i++) rect(132 + i * 9, 2, 6, 6, RED);
+  text(2, 9, WHITE, "SCORE");
+  numw(34, 9, YELLOW, getscore(), 5);
+  text(78, 9, WHITE, "DEPTH");
+  num(110, 9, LIME, level + 1);
+  if (clear > 0) ctext(60, YELLOW, "LEVEL CLEAR");
+}

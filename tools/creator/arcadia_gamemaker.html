@@ -1,0 +1,3330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcadia Game Maker</title>
+<style>
+:root{--bg:#eef1f6;--panel:#fff;--ink:#1d2330;--mut:#64708a;--line:#d5dbe8;--acc:#3b6ef5;--bad:#d32f3f;--warn:#b26a00;--ok:#1b8a4b;--ws:#f7f8fb;--dot:#d9deea}
+@media (prefers-color-scheme:dark){:root{--bg:#161a24;--panel:#1f2430;--ink:#e6e9f2;--mut:#98a2bb;--line:#343b4d;--acc:#6f95ff;--bad:#ff7080;--warn:#f0b14a;--ok:#55d08a;--ws:#1a1e29;--dot:#2a3040}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.35 system-ui,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button,select,input,textarea{font:inherit;color:inherit}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0 8px 0 0;letter-spacing:.3px}
+header h1 span{color:var(--acc)}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 11px;cursor:pointer}
+.btn:hover{border-color:var(--acc)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.btn.small{padding:3px 8px;font-size:12.5px}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.sp{flex:1}
+select{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 7px}
+.chip{padding:3px 10px;border-radius:99px;font-weight:600;font-size:12.5px;border:1px solid var(--line)}
+.chip.ok{color:var(--ok);border-color:var(--ok)}.chip.bad{color:var(--bad);border-color:var(--bad)}.chip.warn{color:var(--warn);border-color:var(--warn)}
+main{flex:1;min-height:0;display:grid;grid-template-columns:330px minmax(300px,1fr) 480px}
+#palette{display:flex;background:var(--panel);border-right:1px solid var(--line);min-height:0;transition:background .1s}
+#palette.deleting{background:#ffd9dc}
+#cats{display:flex;flex-direction:column;padding:6px 4px;gap:2px;border-right:1px solid var(--line);width:92px;flex:none;overflow:auto}
+.cat{display:flex;align-items:center;gap:6px;border:0;background:none;padding:7px 6px;border-radius:7px;cursor:pointer;text-align:left;font-size:13px}
+.cat i{width:11px;height:11px;border-radius:50%;background:var(--c);flex:none}
+.cat.on{background:var(--bg);font-weight:700}
+#plist{flex:1;overflow:auto;padding:8px 8px 40px;min-width:0}
+.pitem{margin:0 0 9px;display:flex;align-items:center;gap:3px}
+.pitem .blk{max-width:100%}
+.phead{margin:2px 0 10px}.hint{color:var(--mut);font-size:12px}.pad{padding:8px}
+.psep{height:1px;background:var(--line);margin:8px 0}
+.x{border:0;background:none;color:var(--mut);cursor:pointer;font-size:15px;padding:0 3px}.x:hover{color:var(--bad)}
+#wsWrap{position:relative;min-width:0;min-height:0;display:flex;flex-direction:column}
+#wsBar{display:flex;gap:6px;padding:5px 8px;align-items:center;border-bottom:1px solid var(--line);background:var(--panel)}
+#ws{flex:1;overflow:auto;position:relative;background-color:var(--ws);background-image:radial-gradient(var(--dot) 1px,transparent 1px);background-size:18px 18px}
+#wsInner{position:relative;min-width:100%;min-height:100%}
+#wsHint{position:absolute;left:30px;top:40px;color:var(--mut);font-size:15px;pointer-events:none;display:none;max-width:420px}
+.script{position:absolute}
+.script.orphan>.list{outline:2px dashed var(--bad);outline-offset:3px;border-radius:4px}
+.script.orphan::after{content:"no event block on top - this never runs";position:absolute;left:0;top:-20px;color:var(--bad);font-size:11.5px;white-space:nowrap}
+.list{min-width:60px}
+/* blocks */
+.blk{--c:#888;position:relative;background:var(--c);color:#fff;font-weight:600;font-size:13px;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;box-shadow:inset 0 -2px 0 rgba(0,0,0,.22),0 1px 1px rgba(0,0,0,.18)}
+.blk.ro .in,.blk.ro .slot{pointer-events:none}
+.blk .row{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:6px 10px;min-height:32px}
+.blk .t{white-space:nowrap}
+.blk.stack,.blk.c,.blk.c2{border-radius:4px;width:max-content;min-width:120px;max-width:560px}
+.list>.blk.stack::before,.list>.blk.c::before,.list>.blk.c2::before{content:"";position:absolute;left:14px;top:0;width:20px;height:4px;background:rgba(0,0,0,.28);border-radius:0 0 4px 4px}
+.list>.blk.stack::after,.list>.blk.c::after,.list>.blk.c2::after{content:"";position:absolute;left:14px;bottom:-4px;width:20px;height:4px;background:var(--c);border-radius:0 0 4px 4px;z-index:2}
+.blk.hat{border-radius:20px 20px 4px 4px;margin-top:6px;min-width:150px;width:max-content}
+.blk.hat .row{padding-top:10px}
+.blk.hat::after{content:"";position:absolute;left:14px;bottom:-4px;width:20px;height:4px;background:var(--c);border-radius:0 0 4px 4px;z-index:2}
+.blk.rep,.blk.bool{display:inline-block;border-radius:15px;box-shadow:inset 0 -2px 0 rgba(0,0,0,.2);width:max-content;max-width:100%}
+.blk.rep .row,.blk.bool .row{padding:3px 9px;min-height:24px;flex-wrap:nowrap}
+.blk.bool{border-radius:6px;clip-path:polygon(9px 0,calc(100% - 9px) 0,100% 50%,calc(100% - 9px) 100%,9px 100%,0 50%);padding:0 3px}
+.cbody{margin-left:14px;background:rgba(0,0,0,.16);min-height:18px;padding:6px 0 4px;border-radius:0 0 0 4px}
+.cbody>.list{min-height:14px;padding-bottom:4px}
+.cfoot{height:14px;background:var(--c);border-radius:0 0 4px 4px}
+.blk .row.else{padding-top:3px;padding-bottom:3px;min-height:22px}
+.slot{display:inline-flex;align-items:center;border-radius:12px;min-height:22px;transition:box-shadow .08s}
+.slot.hot{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--acc)}
+.slot.filled{background:rgba(0,0,0,.12);padding:1px}
+.slot .blk.rep,.slot .blk.bool{box-shadow:inset 0 -2px 0 rgba(0,0,0,.25)}
+.ph{display:inline-block;width:36px;height:20px;background:rgba(0,0,0,.28);clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,8px 100%,0 50%)}
+.in{border:0;border-radius:12px;padding:2px 7px;background:#fff;color:#222;font-weight:600;font-size:13px;outline:none;min-height:22px}
+.in.n{text-align:center;width:3em}.in.bad{background:#ffd0d4;color:#900}
+select.in{padding:2px 4px;cursor:pointer}
+.boolslot .ph,.slot{vertical-align:middle}
+#ghost{position:fixed;display:none;pointer-events:none;z-index:50;opacity:.92;filter:drop-shadow(0 6px 8px rgba(0,0,0,.3))}
+#dropind{position:fixed;display:none;width:130px;height:5px;background:#fff;border-radius:3px;box-shadow:0 0 0 2px var(--acc);pointer-events:none;z-index:49}
+.menu{position:fixed;z-index:80;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.25);padding:4px;display:flex;flex-direction:column;min-width:190px}
+.menu button{border:0;background:none;text-align:left;padding:7px 10px;border-radius:6px;cursor:pointer}.menu button:hover{background:var(--bg)}
+/* side */
+#side{display:flex;flex-direction:column;background:var(--panel);border-left:1px solid var(--line);min-height:0;min-width:0;overflow-y:auto}
+#stageBox{padding:10px;border-bottom:1px solid var(--line)}
+#screenWrap{position:relative;width:100%;max-width:400px;aspect-ratio:160/128;margin:0 auto;background:#000;border-radius:6px;overflow:hidden;border:3px solid #222}
+#screen{width:100%;height:100%;image-rendering:pixelated;display:block}
+#overlay{position:absolute;inset:0;background:rgba(0,0,0,.72);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:12px;font-size:13px}
+#overlay .ovh{font-size:22px;font-weight:800;letter-spacing:1px}
+#overlay pre{white-space:pre-wrap;font:12px/1.35 ui-monospace,Consolas,monospace;max-width:100%;overflow:auto;max-height:70%;margin:0;text-align:left;color:#ffd0d4}
+#pauseTag{position:absolute;top:6px;right:8px;background:#000a;color:#fff;border-radius:4px;padding:1px 7px;font-size:11px;display:none}
+#ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+#meter{margin-top:6px;font-size:12px;color:var(--mut)}
+#opsbar{height:5px;background:var(--ok);border-radius:3px;width:0}#opsbar.hot{background:var(--warn)}
+#meterTrack{height:5px;background:var(--line);border-radius:3px;margin-top:3px}
+#pad{display:grid;grid-template-columns:repeat(3,34px);grid-template-rows:repeat(3,28px);gap:2px}
+#pad button,#abpad button{border:1px solid var(--line);background:var(--bg);border-radius:6px;cursor:pointer;padding:0;touch-action:none}
+#abpad{display:flex;gap:6px}#abpad button{width:42px;height:42px;border-radius:50%;font-weight:700}
+#tabs{display:flex;gap:2px;padding:6px 8px 0;border-bottom:1px solid var(--line)}
+.tab{border:0;background:none;padding:7px 12px;border-radius:8px 8px 0 0;cursor:pointer;color:var(--mut);font-weight:600}
+.tab.on{background:var(--bg);color:var(--ink)}
+.badge{display:none;background:var(--bad);color:#fff;border-radius:99px;padding:0 6px;font-size:11px;margin-left:5px}
+#panes{flex:1 0 auto;min-height:340px;background:var(--bg)}
+.pane{padding:10px}
+.sprlist{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.sprthumb{display:flex;flex-direction:column;align-items:center;gap:2px;width:56px;border:2px solid var(--line);background:var(--panel);border-radius:8px;padding:4px 2px;cursor:pointer;font-size:11px;overflow:hidden}
+.sprthumb.on{border-color:var(--acc)}.sprthumb span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sprthumb.add b{font-size:26px;line-height:32px;color:var(--acc)}
+canvas.thumb{width:32px;height:32px;image-rendering:pixelated;background:#222;border-radius:3px}
+.edwrap{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.pgrid{display:grid;grid-template-columns:repeat(8,30px);grid-template-rows:repeat(8,30px);gap:1px;background:var(--line);padding:1px;border-radius:4px;touch-action:none;user-select:none}
+.pc{background:#222;cursor:crosshair}
+.ptools{display:flex;flex-wrap:wrap;gap:4px;max-width:210px;margin-bottom:6px}
+.form{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.f{display:flex;align-items:center;gap:8px}.f>span:first-child{width:160px;flex:none;color:var(--mut)}
+.f input[type=text],.f input[type=number],.f select{flex:1;min-width:0;border:1px solid var(--line);border-radius:7px;padding:4px 7px;background:var(--panel)}
+.f input[type=text]{max-width:240px}
+.row2{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.bad{color:var(--bad)}.warn{color:var(--warn)}.ok{color:var(--ok)}.ok.big{font-weight:700;font-size:15px;margin-bottom:6px}
+#checksPane .bad,#checksPane .warn{margin:3px 0;padding:6px 8px;border-radius:7px;background:var(--panel);border-left:4px solid currentColor;font-size:13px}
+.guard div{font-size:12.5px;margin:2px 0}
+.guard .bad,.guard .warn{padding:4px 8px;border-radius:6px;background:var(--panel);border-left:3px solid currentColor}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.stat{position:relative;background:var(--panel);border-radius:7px;padding:5px 8px;font-size:12.5px;display:flex;justify-content:space-between;overflow:hidden}
+.stat i{position:absolute;left:0;bottom:0;height:3px;background:var(--acc)}
+#codeTa{width:100%;height:420px;margin-top:8px;font:12px/1.4 ui-monospace,Consolas,monospace;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:8px;resize:vertical;white-space:pre}
+.lgrid{display:grid;grid-template-columns:repeat(20,20px);grid-auto-rows:20px;gap:1px;background:var(--line);padding:1px;margin:8px 0;width:max-content;touch-action:none;user-select:none;border-radius:4px}
+.lc{background:var(--cbg,#16213a);color:#fff;font-size:10px;line-height:20px;text-align:center;cursor:crosshair;overflow:hidden}
+.lc.solid{background:var(--pc,#d80)}.lc.selF{background:#7fd}.lc.selE{background:#e66}
+.pgrid{border:2px solid var(--acc)}
+.pgrid .pc{outline:0}
+.swatches{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+.sw{width:22px;height:22px;border:2px solid var(--line);border-radius:5px;cursor:pointer;padding:0}
+.sw.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--acc)}
+.sw.none{background:repeating-linear-gradient(45deg,#888 0 3px,#ddd 3px 6px)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:var(--panel);padding:4px 10px;cursor:pointer;font-weight:600;color:var(--mut)}
+.seg button.on{background:var(--acc);color:#fff}
+.nmbad{display:block;margin:2px 0;padding:4px 8px;border-radius:6px;background:var(--panel);border-left:3px solid currentColor;font-size:12.5px}
+.help h4{margin:14px 0 4px}.help p{margin:4px 0}
+@media (max-width:1180px){
+  body{overflow:auto}
+  main{grid-template-columns:270px minmax(260px,1fr);grid-template-rows:minmax(420px,70vh) auto}
+  #side{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}
+  #panes{max-height:none;overflow:visible}
+}
+@media (max-height:820px) and (min-width:1181px){#screenWrap{max-width:300px}#meter div{display:none}}
+@media (max-width:640px){main{grid-template-columns:1fr;grid-template-rows:auto minmax(380px,60vh) auto}#palette{max-height:260px;border-right:0;border-bottom:1px solid var(--line)}#cats{width:80px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Arcadia <span>Game Maker</span></h1>
+  <select id="tplSel" title="Templates"></select><button class="btn" id="btnTpl">New from template</button>
+  <button class="btn" id="btnOpen">Open project...</button><input type="file" id="fileOpen" accept=".json,application/json" style="display:none">
+  <button class="btn" id="btnSave">Save project</button>
+  <span class="sp"></span>
+  <span class="chip" id="status">building...</span>
+  <button class="btn" id="btnArcl">Download .arcl</button>
+  <button class="btn primary" id="btnArc">Download .arc cartridge</button>
+</header>
+<main>
+  <aside id="palette"><nav id="cats"></nav><div id="plist"></div></aside>
+  <section id="wsWrap">
+    <div id="wsBar"><button class="btn small" id="btnUndo">Undo</button><button class="btn small" id="btnClean">Clean up</button>
+      <span class="hint">Drag blocks into the area, snap them under an event. Drag a block onto the left list to delete. Right-click for more.</span></div>
+    <div id="ws"><div id="wsInner"></div><div id="wsHint">This project has no scripts yet.<br>Pick the Events tab on the left and drag "every frame" here.</div></div>
+  </section>
+  <aside id="side">
+    <div id="stageBox">
+      <div id="screenWrap"><canvas id="screen" width="160" height="128"></canvas><div id="overlay"></div><div id="pauseTag">PAUSED</div></div>
+      <div id="ctl">
+        <button class="btn primary small" id="btnRun">&#9654; Run / Restart</button>
+        <button class="btn small" id="btnPause">Pause</button>
+        <select id="tier" title="Difficulty tier"><option value="0">Level 0</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option></select>
+        <label class="hint"><input type="checkbox" id="twop"> 2P</label>
+        <label class="hint"><input type="checkbox" id="mute"> mute</label>
+        <span class="sp"></span>
+        <div id="pad"><span></span><button data-b="4">&#9650;</button><span></span><button data-b="1">&#9664;</button><span></span><button data-b="2">&#9654;</button><span></span><button data-b="8">&#9660;</button><span></span></div>
+        <div id="abpad"><button data-b="32">B</button><button data-b="16">A</button></div>
+      </div>
+      <div id="meter">Score <b id="score">-</b> &nbsp; Speed: <span id="ops">-</span><div id="meterTrack"><div id="opsbar"></div></div>
+        <div>Keys: arrows, Z = A, X = B, Enter = pause (Start), Shift = pause (Select)</div></div>
+    </div>
+    <div id="tabs"></div>
+    <div id="panes"></div>
+  </aside>
+</main>
+<div id="ghost"></div><div id="dropind"></div>
+<script id="core">
+const ARC = (function () {
+'use strict';
+// ===== ARCL assembler (port of tools/make_carts.py) + VM (port of tools/arcvm_ref.py) =====
+const R = {
+  BUDGET: 30000, STACK_MAX: 64, LOCALS_MAX: 128, CALLS_MAX: 12, GLOBALS_MAX: 128, MEM_MAX: 1024,
+  SPR_MAX: 64, CODE_MAX: 8192, STR_MAX: 2048, HDR_SIZE: 208, SW: 160, SH: 128
+};
+const CORE = {
+  PUSH8: 1, PUSH16: 2, DUP: 3, DROP: 4, SWAP: 5, OVER: 6,
+  ADD: 10, SUB: 11, MUL: 12, DIV: 13, MOD: 14, NEG: 15, AND: 16, OR: 17,
+  XOR: 18, NOT: 19, SHL: 20, SHR: 21, LNOT: 22,
+  EQ: 23, NE: 24, LT: 25, LE: 26, GT: 27, GE: 28,
+  MIN: 29, MAX: 30, ABS: 31, FMUL: 32, CLAMP: 33, SIGN: 34,
+  LDG: 40, STG: 41, LDL: 42, STL: 43, LDM: 44, STM: 45,
+  JMP: 50, JZ: 51, JNZ: 52, CALL: 53, RET: 54, FRAME: 55
+};
+// name -> [opcode, nargs, returnsValue]
+const BUILTINS = {
+  min: [29, 2, 1], max: [30, 2, 1], abs: [31, 1, 1], fmul: [32, 2, 1], clamp: [33, 3, 1], sign: [34, 1, 1],
+  wait: [55, 0, 0],
+  cls: [60, 1, 0], pix: [61, 3, 0], rect: [62, 5, 0], box: [63, 5, 0], line: [64, 5, 0], circ: [65, 4, 0],
+  disc: [66, 4, 0], text: [67, 4, 0], num: [68, 4, 0], ctext: [69, 3, 0], tsize: [70, 1, 0], spr: [71, 4, 0],
+  sprf: [72, 5, 0], drawmap: [73, 5, 0], setpal: [74, 2, 0], getpix: [75, 2, 1], rgb: [76, 3, 1],
+  hit: [77, 8, 1], numw: [78, 5, 0],
+  btn: [85, 1, 1], btnp: [86, 1, 1],
+  rnd: [90, 1, 1], frames: [91, 0, 1], sin: [92, 1, 1], cos: [93, 1, 1], sqrt: [94, 1, 1], rndseed: [95, 1, 0],
+  tone: [100, 2, 0], sfx: [101, 1, 0], burst: [102, 4, 0], shake: [103, 2, 0], led: [104, 4, 0],
+  score: [110, 1, 0], getscore: [111, 0, 1], gameover: [112, 1, 0], hiscore: [113, 0, 1], tier: [114, 0, 1],
+  player: [115, 0, 1], saveget: [116, 1, 1], saveset: [117, 2, 0], memfill: [118, 3, 0], mget: [119, 5, 1],
+  mset: [120, 6, 0], addscore: [121, 1, 0], twop: [122, 0, 1]
+};
+const COLOR_NAMES = ['BLACK', 'WHITE', 'RED', 'GREEN', 'BLUE', 'YELLOW', 'CYAN', 'MAGENTA', 'ORANGE',
+  'GRAY', 'DKGRAY', 'PINK', 'LIME', 'BROWN', 'NAVY', 'PURPLE'];
+const PALETTE_RGB = [[0, 0, 0], [255, 255, 255], [240, 50, 50], [60, 220, 90], [60, 110, 255], [255, 230, 70],
+  [60, 220, 230], [230, 80, 230], [255, 150, 40], [150, 150, 160], [60, 60, 75], [255, 150, 190],
+  [160, 240, 60], [150, 90, 40], [20, 30, 110], [140, 80, 220]];
+function c565(r, g, b) { return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3); }
+const PALETTE = PALETTE_RGB.map(c => c565(c[0], c[1], c[2]));
+const SINQ = []; for (let i = 0; i <= 64; i++) SINQ.push(Math.round(127 * Math.sin(2 * Math.PI * i / 256)));
+function vmSin(a) {
+  a &= 255;
+  if (a <= 64) return SINQ[a];
+  if (a <= 128) return SINQ[128 - a];
+  if (a <= 192) return -SINQ[a - 128];
+  return -SINQ[256 - a];
+}
+function w16(x) { return (x << 16) >> 16; }
+function fnv1a(data) {
+  let h = 2166136261;
+  for (let i = 0; i < data.length; i++) { h = Math.imul(h ^ data[i], 16777619) >>> 0; }
+  return h >>> 0;
+}
+class CompileError extends Error { }
+class CartError extends Error { }
+
+// ---------------- lexer ----------------
+const TOK_RE = /(?<ws>[ \t\r]+)|(?<nl>\n)|(?<cmt>\/\/[^\n]*)|(?<hex>0[xX][0-9a-fA-F]+)|(?<num>\d+)|(?<chr>'(?:\\.|[^'\\])')|(?<str>"(?:\\.|[^"\\])*")|(?<id>[A-Za-z_][A-Za-z0-9_]*)|(?<op><<=|>>=|==|!=|<=|>=|<<|>>|&&|\|\||\+=|-=|\*=|\/=|%=|&=|\|=|\^=|\+\+|--|[-+*\/%&|^~!<>=(){}\[\];,?:])/y;
+function unescape(s) {
+  return s.replace(/\\(x[0-9a-fA-F]{2}|[0-7]{1,3}|.)/g, (m, e) => {
+    if (e[0] === 'x' && e.length === 3) return String.fromCharCode(parseInt(e.slice(1), 16));
+    if (/^[0-7]+$/.test(e)) return String.fromCharCode(parseInt(e, 8));
+    const map = { n: '\n', t: '\t', r: '\r', a: '\x07', b: '\b', f: '\f', v: '\v', '\\': '\\', '"': '"', "'": "'" };
+    return e in map ? map[e] : m;
+  });
+}
+function lex(src) {
+  const toks = [];
+  let pos = 0, line = 1;
+  while (pos < src.length) {
+    TOK_RE.lastIndex = pos;
+    const m = TOK_RE.exec(src);
+    if (!m) throw new CompileError('line ' + line + ': bad character ' + JSON.stringify(src[pos]));
+    let k = null;
+    for (const key in m.groups) if (m.groups[key] !== undefined) { k = key; break; }
+    const t = m[0];
+    pos = TOK_RE.lastIndex;
+    if (k === 'nl') line++;
+    else if (k === 'ws' || k === 'cmt') { }
+    else if (k === 'hex') toks.push(['num', parseInt(t, 16), line]);
+    else if (k === 'num') toks.push(['num', parseInt(t, 10), line]);
+    else if (k === 'chr') toks.push(['num', unescape(t.slice(1, -1)).charCodeAt(0), line]);
+    else if (k === 'str') toks.push(['str', unescape(t.slice(1, -1)), line]);
+    else if (k === 'id') toks.push(['id', t, line]);
+    else toks.push(['op', t, line]);
+  }
+  toks.push(['eof', '', line]);
+  return toks;
+}
+
+// ---------------- directives ----------------
+function splitDirectives(src) {
+  const outLines = [], dirs = [];
+  const lines = src.split('\n');
+  let i = 0;
+  while (i < lines.length) {
+    const ln = lines[i];
+    const s = ln.trim();
+    if (s.startsWith('@')) {
+      const start = i;
+      let text = s;
+      i++;
+      while (i < lines.length && lines[i].trim().startsWith('"')) {
+        text += ' ' + lines[i].trim();
+        outLines.push('');
+        i++;
+      }
+      outLines.push('');
+      const last = text.split('//').pop();
+      if (last.indexOf('"') < 0) text = text.replace(/\s\/\/.*$/, '');
+      const m = text.match(/^@(\w+)\s*([\s\S]*)$/);
+      if (!m) throw new CompileError('line ' + (start + 1) + ': bad directive');
+      const rest = m[2];
+      const args = [];
+      const re = /"((?:\\.|[^"\\])*)"|(\S+)/g;
+      let am;
+      while ((am = re.exec(rest)) !== null) {
+        if (am[1] !== undefined) args.push(['s', unescape(am[1])]);
+        else args.push(['w', am[2]]);
+      }
+      dirs.push([start + 1, m[1], args]);
+      continue;
+    }
+    outLines.push(ln);
+    i++;
+  }
+  return [outLines.join('\n'), dirs];
+}
+
+// ---------------- parser ----------------
+class P {
+  constructor(toks) { this.t = toks; this.i = 0; }
+  peek(k = 0) { return this.t[Math.min(this.i + k, this.t.length - 1)]; }
+  next() { return this.t[this.i++]; }
+  err(msg, t) { t = t || this.peek(); throw new CompileError('line ' + t[2] + ': ' + msg + ' (near ' + JSON.stringify(t[1]) + ')'); }
+  isOp(v) { const t = this.peek(); return t[0] === 'op' && t[1] === v; }
+  isKw(v) { const t = this.peek(); return t[0] === 'id' && t[1] === v; }
+  acceptOp(v) { if (this.isOp(v)) { this.i++; return true; } return false; }
+  expectOp(v) { if (!this.acceptOp(v)) this.err('expected ' + JSON.stringify(v)); }
+  expectId() { const t = this.next(); if (t[0] !== 'id') this.err('expected a name', t); return t[1]; }
+  expr(lvl = -1) {
+    if (lvl === -1) {
+      const c = this.expr(0);
+      if (this.isOp('?')) {
+        const t = this.next();
+        const a = this.expr(-1);
+        this.expectOp(':');
+        const b = this.expr(-1);
+        return ['tern', c, a, b, t[2]];
+      }
+      return c;
+    }
+    if (lvl >= P.BIN.length) return this.unary();
+    let a = this.expr(lvl + 1);
+    for (; ;) {
+      const t = this.peek();
+      if (t[0] === 'op' && P.BIN[lvl].includes(t[1])) {
+        this.i++;
+        const b = this.expr(lvl + 1);
+        a = ['bin', t[1], a, b, t[2]];
+      } else return a;
+    }
+  }
+  unary() {
+    const t = this.peek();
+    if (t[0] === 'op' && (t[1] === '-' || t[1] === '!' || t[1] === '~')) {
+      this.i++;
+      return ['un', t[1], this.unary(), t[2]];
+    }
+    return this.postfix();
+  }
+  postfix() {
+    const t = this.next();
+    if (t[0] === 'num') return ['num', t[1], t[2]];
+    if (t[0] === 'str') return ['str', t[1], t[2]];
+    if (t[0] === 'op' && t[1] === '(') { const e = this.expr(); this.expectOp(')'); return e; }
+    if (t[0] === 'id') {
+      if (this.isOp('(')) {
+        this.i++;
+        const args = [];
+        if (!this.isOp(')')) { for (; ;) { args.push(this.expr()); if (!this.acceptOp(',')) break; } }
+        this.expectOp(')');
+        return ['call', t[1], args, t[2]];
+      }
+      if (this.isOp('[')) {
+        this.i++;
+        const ix = this.expr();
+        this.expectOp(']');
+        return ['idx', t[1], ix, t[2]];
+      }
+      return ['name', t[1], t[2]];
+    }
+    this.err('expected an expression', t);
+  }
+  simple() {
+    const e = this.expr();
+    const t = this.peek();
+    if (t[0] === 'op' && P.ASSIGN.includes(t[1])) {
+      this.i++;
+      if (e[0] !== 'name' && e[0] !== 'idx') this.err('cannot assign to this', t);
+      const rhs = this.expr();
+      return ['assign', e, t[1], rhs, t[2]];
+    }
+    if (t[0] === 'op' && (t[1] === '++' || t[1] === '--')) {
+      this.i++;
+      if (e[0] !== 'name' && e[0] !== 'idx') this.err('cannot modify this', t);
+      return ['assign', e, t[1] === '++' ? '+=' : '-=', ['num', 1, t[2]], t[2]];
+    }
+    if (e[0] !== 'call') this.err('this expression does nothing', t);
+    return ['expr', e, t[2]];
+  }
+  vardecl() {
+    const decls = [];
+    for (; ;) {
+      const t = this.next();
+      if (t[0] !== 'id') this.err('expected a name', t);
+      let init = null;
+      if (this.acceptOp('=')) init = this.expr();
+      decls.push([t[1], init, t[2]]);
+      if (!this.acceptOp(',')) break;
+    }
+    return decls;
+  }
+  stmt() {
+    const t = this.peek();
+    if (t[0] === 'op' && t[1] === '{') return this.block();
+    if (t[0] === 'id') {
+      const k = t[1];
+      if (k === 'var') { this.i++; const d = this.vardecl(); this.expectOp(';'); return ['vars', d, t[2]]; }
+      if (k === 'if') {
+        this.i++; this.expectOp('('); const c = this.expr(); this.expectOp(')');
+        const a = this.stmt();
+        let b = null;
+        if (this.isKw('else')) { this.i++; b = this.stmt(); }
+        return ['if', c, a, b, t[2]];
+      }
+      if (k === 'while') {
+        this.i++; this.expectOp('('); const c = this.expr(); this.expectOp(')');
+        return ['while', c, this.stmt(), t[2]];
+      }
+      if (k === 'for') {
+        this.i++; this.expectOp('(');
+        const init = this.isOp(';') ? null : this.simpleOrVar();
+        this.expectOp(';');
+        const cond = this.isOp(';') ? null : this.expr();
+        this.expectOp(';');
+        const step = this.isOp(')') ? null : this.simple();
+        this.expectOp(')');
+        return ['for', init, cond, step, this.stmt(), t[2]];
+      }
+      if (k === 'break' || k === 'continue') { this.i++; this.expectOp(';'); return [k, t[2]]; }
+      if (k === 'return') {
+        this.i++;
+        const e = this.isOp(';') ? null : this.expr();
+        this.expectOp(';');
+        return ['return', e, t[2]];
+      }
+    }
+    const s = this.simple();
+    this.expectOp(';');
+    return s;
+  }
+  simpleOrVar() {
+    if (this.isKw('var')) { const t = this.next(); return ['vars', this.vardecl(), t[2]]; }
+    return this.simple();
+  }
+  block() {
+    this.expectOp('{');
+    const out = [];
+    while (!this.isOp('}')) {
+      if (this.peek()[0] === 'eof') this.err('missing }');
+      out.push(this.stmt());
+    }
+    this.expectOp('}');
+    return ['block', out];
+  }
+  program() {
+    const items = [];
+    while (this.peek()[0] !== 'eof') {
+      const t = this.next();
+      if (t[0] !== 'id') this.err('expected const/var/array/func', t);
+      if (t[1] === 'const') {
+        const n = this.expectId(); this.expectOp('='); const e = this.expr(); this.expectOp(';');
+        items.push(['const', n, e, t[2]]);
+      } else if (t[1] === 'var') {
+        items.push(['vars', this.vardecl(), t[2]]); this.expectOp(';');
+      } else if (t[1] === 'array') {
+        const n = this.expectId(); this.expectOp('['); const sz = this.expr(); this.expectOp(']');
+        let init = null;
+        if (this.acceptOp('=')) {
+          this.expectOp('{'); init = [];
+          if (!this.isOp('}')) { for (; ;) { init.push(this.expr()); if (!this.acceptOp(',')) break; } }
+          this.expectOp('}');
+        }
+        this.expectOp(';');
+        items.push(['array', n, sz, init, t[2]]);
+      } else if (t[1] === 'func') {
+        const n = this.expectId(); this.expectOp('(');
+        const params = [];
+        if (!this.isOp(')')) { for (; ;) { params.push(this.expectId()); if (!this.acceptOp(',')) break; } }
+        this.expectOp(')');
+        items.push(['func', n, params, this.block(), t[2]]);
+      } else this.err('expected const/var/array/func', t);
+    }
+    return items;
+  }
+}
+P.BIN = [['||'], ['&&'], ['|'], ['^'], ['&'], ['==', '!='], ['<', '<=', '>', '>='], ['<<', '>>'], ['+', '-'], ['*', '/', '%']];
+P.ASSIGN = ['=', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '<<=', '>>='];
+
+// ---------------- code generation ----------------
+const BIN_OPS = {
+  '+': 'ADD', '-': 'SUB', '*': 'MUL', '/': 'DIV', '%': 'MOD', '&': 'AND', '|': 'OR', '^': 'XOR',
+  '<<': 'SHL', '>>': 'SHR', '==': 'EQ', '!=': 'NE', '<': 'LT', '<=': 'LE', '>': 'GT', '>=': 'GE'
+};
+const isInt = v => typeof v === 'number';
+
+class Gen {
+  constructor(items, consts) {
+    this.items = items;
+    this.consts = Object.assign({}, consts);
+    this.code = [];
+    this.strs = [];
+    this.strIx = new Map();
+    this.globals = new Map();
+    this.arrays = new Map();
+    this.memInit = [];
+    this.memWords = 0;
+    this.funcs = new Map();
+    this.fixups = [];
+    this.loc = null;
+    this.loops = [];
+    this.line = 0;
+  }
+  err(msg, line) { throw new CompileError('line ' + (line || this.line) + ': ' + msg); }
+  constEval(e) {
+    const k = e[0];
+    if (k === 'num') return e[1];
+    if (k === 'name') {
+      if (e[1] in this.consts) return this.consts[e[1]];
+      this.err(JSON.stringify(e[1]) + ' is not a constant', e[2]);
+    }
+    if (k === 'str') return this.string(e[1]);
+    if (k === 'tern') return this.constEval(e[1]) ? this.constEval(e[2]) : this.constEval(e[3]);
+    if (k === 'un') {
+      const a = this.constEval(e[2]);
+      return w16({ '-': -a, '!': +(a === 0), '~': ~a }[e[1]]);
+    }
+    if (k === 'bin') {
+      const a = this.constEval(e[2]), b = this.constEval(e[3]);
+      const o = e[1];
+      if (o === '/' || o === '%') {
+        if (b === 0) this.err('divide by zero', e[4]);
+        const q = Math.floor(Math.abs(a) / Math.abs(b)) * ((a < 0) === (b < 0) ? 1 : -1);
+        return w16(o === '/' ? q : a - b * q);
+      }
+      if (o === '&&') return +(!!a && !!b);
+      if (o === '||') return +(!!a || !!b);
+      const f = {
+        '+': () => a + b, '-': () => a - b, '*': () => a * b, '&': () => a & b, '|': () => a | b,
+        '^': () => a ^ b, '<<': () => a << (b & 15), '>>': () => a >> (b & 15),
+        '==': () => +(a === b), '!=': () => +(a !== b), '<': () => +(a < b), '<=': () => +(a <= b),
+        '>': () => +(a > b), '>=': () => +(a >= b)
+      }[o];
+      return w16(f());
+    }
+    this.err('not a constant expression');
+  }
+  string(s) {
+    if (this.strIx.has(s)) return this.strIx.get(s);
+    for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) > 255) this.err('string has a character outside latin1');
+    const off = this.strs.length;
+    if (off + s.length + 1 > R.STR_MAX) this.err('string pool too big');
+    this.strIx.set(s, off);
+    for (let i = 0; i < s.length; i++) this.strs.push(s.charCodeAt(i));
+    this.strs.push(0);
+    return off;
+  }
+  op(name, ...operands) {
+    this.code.push(CORE[name]);
+    for (const o of operands) this.code.push(o & 255);
+  }
+  push(v) {
+    v = w16(v);
+    if (v >= -128 && v <= 127) this.code.push(CORE.PUSH8, v & 255);
+    else this.code.push(CORE.PUSH16, v & 255, (v >> 8) & 255);
+  }
+  jump(name) {
+    this.code.push(CORE[name]);
+    const pos = this.code.length;
+    this.code.push(0, 0);
+    return pos;
+  }
+  patch(pos, target) {
+    const t = target === undefined ? this.code.length : target;
+    this.code[pos] = t & 255;
+    this.code[pos + 1] = (t >> 8) & 255;
+  }
+  jumpTo(name, target) { this.code.push(CORE[name], target & 255, (target >> 8) & 255); }
+  build() {
+    const gvars = [];
+    for (const it of this.items) {
+      const last = it[it.length - 1];
+      this.line = isInt(last) ? last : this.line;
+      if (it[0] === 'const') {
+        this.consts[it[1]] = this.constEval(it[2]);
+      } else if (it[0] === 'vars') {
+        for (const [n, init, ln] of it[1]) {
+          if (this.globals.has(n) || n in this.consts) this.err(JSON.stringify(n) + ' already defined', ln);
+          if (this.globals.size >= R.GLOBALS_MAX) this.err('too many global variables (max ' + R.GLOBALS_MAX + ')', ln);
+          this.globals.set(n, this.globals.size);
+          if (init !== null) gvars.push([n, init]);
+        }
+      } else if (it[0] === 'array') {
+        const n = it[1];
+        const sz = this.constEval(it[2]);
+        if (sz < 1 || this.memWords + sz > R.MEM_MAX) this.err('array ' + JSON.stringify(n) + ' too big (mem limit ' + R.MEM_MAX + ' words)', it[4]);
+        if (this.arrays.has(n) || this.globals.has(n) || n in this.consts) this.err(JSON.stringify(n) + ' already defined', it[4]);
+        const base = this.memWords;
+        this.arrays.set(n, [base, sz]);
+        this.memWords += sz;
+        if (it[3] !== null) {
+          const vals = it[3].map(e => this.constEval(e));
+          if (vals.length > sz) this.err('too many initial values for ' + JSON.stringify(n), it[4]);
+          while (this.memInit.length < base) this.memInit.push(0);
+          for (const v of vals) this.memInit.push(v);
+        }
+      } else if (it[0] === 'func') {
+        if (this.funcs.has(it[1]) || it[1] in BUILTINS) this.err('function ' + JSON.stringify(it[1]) + ' already defined / reserved', it[4]);
+        this.funcs.set(it[1], { addr: null, nargs: it[2].length, nloc: 0, node: it });
+      }
+    }
+    if (!this.funcs.has('frame')) this.err('the cart needs a func frame()');
+    if (this.funcs.get('frame').nargs !== 0) this.err('frame() takes no arguments');
+    if (this.funcs.has('init') && this.funcs.get('init').nargs !== 0) this.err('init() takes no arguments');
+    this.initAddr = this.code.length;
+    this.loc = new Map();
+    for (const [n, init] of gvars) { this.expr(init); this.op('STG', this.globals.get(n)); }
+    if (this.funcs.has('init')) { this.callUser('init', 0, 0); this.op('DROP'); }
+    this.push(0); this.op('RET');
+    this.frameAddr = this.code.length;
+    this.callUser('frame', 0, 0); this.op('DROP');
+    this.push(0); this.op('RET');
+    for (const [name, f] of this.funcs) this.func(name, f);
+    for (const [pos, name] of this.fixups) {
+      const f = this.funcs.get(name);
+      this.code[pos] = f.addr & 255;
+      this.code[pos + 1] = (f.addr >> 8) & 255;
+      this.code[pos + 3] = f.nloc;
+    }
+    if (this.code.length > R.CODE_MAX) this.err('code too big: ' + this.code.length + ' bytes (max ' + R.CODE_MAX + ')');
+    while (this.memInit.length > this.memWords) this.memInit.pop();
+  }
+  func(name, f) {
+    const node = f.node;
+    this.line = node[4];
+    f.addr = this.code.length;
+    this.loc = new Map();
+    for (const p of node[2]) {
+      if (this.loc.has(p)) this.err('duplicate parameter ' + JSON.stringify(p));
+      this.loc.set(p, this.loc.size);
+    }
+    this.loops = [];
+    this.block(node[3]);
+    this.push(0); this.op('RET');
+    f.nloc = this.loc.size;
+    if (f.nloc > 60) this.err('function ' + JSON.stringify(name) + ' has too many locals');
+  }
+  callUser(name, nargs, line) {
+    if (!this.funcs.has(name)) this.err('unknown function ' + JSON.stringify(name), line);
+    const f = this.funcs.get(name);
+    if (f.nargs !== nargs) this.err(name + '() takes ' + f.nargs + ' arguments, got ' + nargs, line);
+    this.code.push(CORE.CALL);
+    this.fixups.push([this.code.length, name, line]);
+    this.code.push(0, 0, nargs, 0);
+  }
+  block(node) { for (const s of node[1]) this.stmt(s); }
+  declareLocal(n, line) {
+    if (n in this.consts || this.arrays.has(n)) this.err(JSON.stringify(n) + ' clashes with a constant/array', line);
+    if (!this.loc.has(n)) this.loc.set(n, this.loc.size);
+    return this.loc.get(n);
+  }
+  stmt(s) {
+    const k = s[0];
+    const last = s[s.length - 1];
+    this.line = isInt(last) ? last : this.line;
+    if (k === 'block') this.block(s);
+    else if (k === 'vars') {
+      for (const [n, init, ln] of s[1]) {
+        const slot = this.declareLocal(n, ln);
+        if (init !== null) this.expr(init); else this.push(0);
+        this.op('STL', slot);
+      }
+    } else if (k === 'assign') this.assign(s);
+    else if (k === 'expr') {
+      const ret = this.call(s[1], false);
+      if (ret) this.op('DROP');
+    } else if (k === 'if') {
+      this.expr(s[1]);
+      const jz = this.jump('JZ');
+      this.stmt(s[2]);
+      if (s[3] !== null) {
+        const je = this.jump('JMP');
+        this.patch(jz);
+        this.stmt(s[3]);
+        this.patch(je);
+      } else this.patch(jz);
+    } else if (k === 'while') {
+      const top = this.code.length;
+      this.expr(s[1]);
+      const jz = this.jump('JZ');
+      this.loops.push([top, [], []]);
+      this.stmt(s[2]);
+      this.jumpTo('JMP', top);
+      const [, brks, conts] = this.loops.pop();
+      this.patch(jz);
+      for (const b of brks) this.patch(b);
+      for (const c of conts) this.patch(c, top);
+    } else if (k === 'for') {
+      if (s[1] !== null) this.stmt(s[1]);
+      const top = this.code.length;
+      let jz = null;
+      if (s[2] !== null) { this.expr(s[2]); jz = this.jump('JZ'); }
+      this.loops.push([top, [], []]);
+      this.stmt(s[4]);
+      const step = this.code.length;
+      if (s[3] !== null) this.stmt(s[3]);
+      this.jumpTo('JMP', top);
+      const [, brks, conts] = this.loops.pop();
+      if (jz !== null) this.patch(jz);
+      for (const b of brks) this.patch(b);
+      for (const c of conts) this.patch(c, step);
+    } else if (k === 'break') {
+      if (!this.loops.length) this.err('break outside a loop');
+      this.loops[this.loops.length - 1][1].push(this.jump('JMP'));
+    } else if (k === 'continue') {
+      if (!this.loops.length) this.err('continue outside a loop');
+      this.loops[this.loops.length - 1][2].push(this.jump('JMP'));
+    } else if (k === 'return') {
+      if (s[1] !== null) this.expr(s[1]); else this.push(0);
+      this.op('RET');
+    } else this.err('internal: statement ' + k);
+  }
+  lookup(n) {
+    if (this.loc.has(n)) return ['L', this.loc.get(n)];
+    if (this.globals.has(n)) return ['G', this.globals.get(n)];
+    return null;
+  }
+  assign(s) {
+    const [, target, op, rhs, line] = s;
+    this.line = line;
+    const binop = op === '=' ? null : BIN_OPS[op.slice(0, -1)];
+    if (target[0] === 'name') {
+      const n = target[1];
+      const v = this.lookup(n);
+      if (v === null) {
+        if (n in this.consts || this.arrays.has(n)) this.err('cannot assign to ' + JSON.stringify(n), line);
+        this.err('unknown variable ' + JSON.stringify(n) + ' (declare it with var)', line);
+      }
+      const ld = v[0] === 'G' ? 'LDG' : 'LDL', st = v[0] === 'G' ? 'STG' : 'STL';
+      if (binop) { this.op(ld, v[1]); this.expr(rhs); this.op(binop); }
+      else this.expr(rhs);
+      this.op(st, v[1]);
+    } else {
+      this.arrayAddr(target);
+      if (binop) { this.op('DUP'); this.op('LDM'); this.expr(rhs); this.op(binop); }
+      else this.expr(rhs);
+      this.op('STM');
+    }
+  }
+  arrayAddr(e) {
+    const n = e[1];
+    if (!this.arrays.has(n)) this.err(JSON.stringify(n) + ' is not an array', e[3]);
+    const [base, sz] = this.arrays.get(n);
+    this.expr(e[2]);
+    if (base) { this.push(base); this.op('ADD'); }
+    this.push(base);
+    this.push(base + sz - 1);
+    this.op('CLAMP');
+  }
+  expr(e) {
+    const k = e[0];
+    const last = e[e.length - 1];
+    this.line = isInt(last) ? last : this.line;
+    if (k === 'num') this.push(e[1]);
+    else if (k === 'str') this.push(this.string(e[1]));
+    else if (k === 'name') {
+      const n = e[1];
+      const v = this.lookup(n);
+      if (v) this.op(v[0] === 'G' ? 'LDG' : 'LDL', v[1]);
+      else if (n in this.consts) this.push(this.consts[n]);
+      else if (this.arrays.has(n)) this.push(this.arrays.get(n)[0]);
+      else this.err('unknown name ' + JSON.stringify(n), e[2]);
+    } else if (k === 'idx') { this.arrayAddr(e); this.op('LDM'); }
+    else if (k === 'un') { this.expr(e[2]); this.op({ '-': 'NEG', '!': 'LNOT', '~': 'NOT' }[e[1]]); }
+    else if (k === 'bin') {
+      const o = e[1];
+      if (o === '&&') {
+        this.expr(e[2]);
+        const j0 = this.jump('JZ');
+        this.expr(e[3]);
+        this.op('LNOT'); this.op('LNOT');
+        const je = this.jump('JMP');
+        this.patch(j0);
+        this.push(0);
+        this.patch(je);
+      } else if (o === '||') {
+        this.expr(e[2]);
+        const j1 = this.jump('JNZ');
+        this.expr(e[3]);
+        this.op('LNOT'); this.op('LNOT');
+        const je = this.jump('JMP');
+        this.patch(j1);
+        this.push(1);
+        this.patch(je);
+      } else {
+        this.expr(e[2]); this.expr(e[3]); this.op(BIN_OPS[o]);
+      }
+    } else if (k === 'tern') {
+      this.expr(e[1]);
+      const jz = this.jump('JZ');
+      this.expr(e[2]);
+      const je = this.jump('JMP');
+      this.patch(jz);
+      this.expr(e[3]);
+      this.patch(je);
+    } else if (k === 'call') {
+      if (!this.call(e, true)) this.err(e[1] + '() does not return a value', e[3]);
+    } else this.err('internal: expr ' + k);
+  }
+  call(e, want) {
+    const [, name, args, line] = e;
+    this.line = line;
+    if (name in BUILTINS) {
+      const [opc, nargs, ret] = BUILTINS[name];
+      if (args.length !== nargs) this.err(name + '() takes ' + nargs + ' arguments, got ' + args.length, line);
+      for (const a of args) this.expr(a);
+      this.code.push(opc);
+      return !!ret;
+    }
+    for (const a of args) this.expr(a);
+    this.callUser(name, args.length, line);
+    return true;
+  }
+}
+
+function defaultConsts() {
+  const c = {};
+  COLOR_NAMES.forEach((n, i) => { c[n] = i; });
+  Object.assign(c, { LEFT: 0, RIGHT: 1, UP: 2, DOWN: 3, A: 4, B: 5, SW: 160, SH: 128, TRUE: 1, FALSE: 0 });
+  return c;
+}
+function parseRows(args, what, n = 8) {
+  const rows = args.filter(a => a[0] === 's').map(a => a[1]);
+  if (rows.length !== n) throw new CompileError(what + ' needs ' + n + ' row strings of 8 characters');
+  return rows.map(r => {
+    if (r.length !== 8) throw new CompileError(what + ' row ' + JSON.stringify(r) + ' is not 8 characters');
+    let v = 0;
+    for (let i = 0; i < 8; i++) if ('#Xx*'.includes(r[i])) v |= 0x80 >> i;
+    return v;
+  });
+}
+function fixed(s, n, what) {
+  for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) > 255) throw new CompileError(what + ' has a character outside latin1');
+  if (s.length > n) throw new CompileError(what + ' ' + JSON.stringify(s) + ' is longer than ' + n + ' characters');
+  const b = new Uint8Array(n);
+  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+  return b;
+}
+
+// returns {blob:Uint8Array, meta, g}
+function compileSource(src) {
+  const [codeText, dirs] = splitDirectives(src);
+  const meta = { name: null, blurb: '', author: '', version: 1, color: 8, twop: false, lower: false,
+    tiers: ['NORMAL', 'EASY', 'HARD', 'EXTREME'], help: [], icon: null };
+  const sprites = [];
+  const consts = defaultConsts();
+  for (const [ln, d, args] of dirs) {
+    try {
+      if (d === 'name') meta.name = args[0][1];
+      else if (d === 'blurb') meta.blurb = args[0][1];
+      else if (d === 'author') meta.author = args[0][1];
+      else if (d === 'version') { meta.version = parseInt(args[0][1], 10); if (isNaN(meta.version)) throw new Error('bad number'); }
+      else if (d === 'color') {
+        const c = args[0][1].toUpperCase();
+        meta.color = COLOR_NAMES.includes(c) ? COLOR_NAMES.indexOf(c) : parseInt(c, 10);
+        if (isNaN(meta.color)) throw new Error('bad colour');
+      }
+      else if (d === 'twoplayer') meta.twop = true;
+      else if (d === 'lower') meta.lower = true;
+      else if (d === 'tiers') {
+        const t = args.map(a => a[1]);
+        if (t.length !== 4) throw new CompileError('@tiers needs 4 names');
+        meta.tiers = t;
+      }
+      else if (d === 'help') meta.help = args.map(a => a[1]).slice(0, 3);
+      else if (d === 'icon') meta.icon = parseRows(args, '@icon');
+      else if (d === 'sprite') {
+        const name = args[0][1];
+        sprites.push(parseRows(args.slice(1), '@sprite ' + name));
+        if (!/^[A-Za-z_]\w*$/.test(name)) throw new CompileError('bad sprite name ' + JSON.stringify(name));
+        consts[name] = sprites.length - 1;
+      }
+      else throw new CompileError('unknown directive @' + d);
+    } catch (e) {
+      if (e instanceof CompileError) throw new CompileError('line ' + ln + ': ' + e.message);
+      throw new CompileError('line ' + ln + ': bad @' + d + ' directive (' + e.message + ')');
+    }
+  }
+  if (!meta.name) throw new CompileError('missing @name');
+  if (meta.icon === null) throw new CompileError('missing @icon');
+  if (sprites.length > R.SPR_MAX) throw new CompileError('too many sprites (max ' + R.SPR_MAX + ')');
+  const toks = lex(codeText);
+  const items = new P(toks).program();
+  const g = new Gen(items, consts);
+  g.build();
+  const memInit = g.memInit.map(w16);
+  const code = g.code, strs = g.strs;
+  const nspr = sprites.length;
+  const payLen = code.length + strs.length + nspr * 8 + memInit.length * 2;
+  const pay = new Uint8Array(payLen);
+  let o = 0;
+  pay.set(code, o); o += code.length;
+  pay.set(strs, o); o += strs.length;
+  for (const s of sprites) { pay.set(s, o); o += 8; }
+  for (const v of memInit) { pay[o++] = v & 255; pay[o++] = (v >> 8) & 255; }
+  const hdr = new Uint8Array(R.HDR_SIZE);
+  const dv = new DataView(hdr.buffer);
+  hdr.set([0x41, 0x52, 0x43, 0x31], 0);
+  hdr[4] = 1;
+  hdr[5] = (meta.twop ? 1 : 0) | (meta.lower ? 2 : 0);
+  hdr[6] = meta.version & 255;
+  hdr[7] = nspr;
+  dv.setUint16(8, code.length, true);
+  dv.setUint16(10, strs.length, true);
+  dv.setUint16(12, g.memWords, true);
+  dv.setUint16(14, memInit.length, true);
+  dv.setUint16(16, g.initAddr, true);
+  dv.setUint16(18, g.frameAddr, true);
+  dv.setUint32(20, fnv1a(pay), true);
+  hdr[24] = g.globals.size;
+  hdr[25] = meta.color & 15;
+  hdr.set(fixed(meta.name, 15, 'name'), 32);
+  hdr.set(fixed(meta.blurb, 23, 'blurb'), 48);
+  hdr.set(fixed(meta.author, 15, 'author'), 72);
+  meta.tiers.forEach((t, i) => hdr.set(fixed(t, 7, 'tier name'), 88 + i * 8));
+  hdr.set(meta.icon, 120);
+  meta.help.forEach((h, i) => hdr.set(fixed(h, 23, 'help line'), 128 + i * 24));
+  const blob = new Uint8Array(hdr.length + pay.length);
+  blob.set(hdr, 0); blob.set(pay, hdr.length);
+  if (blob.length > 14000) throw new CompileError('cart too big (' + blob.length + ' bytes)');
+  return { blob, meta, g };
+}
+
+// ---------------- collision guard ----------------
+const GENRE_WORDS = ['lander', 'landing', 'invader', 'breakout', 'brick', 'brix', 'frogger', 'hopper', 'pong', 'snake',
+  'tetris', 'racer', 'racing', 'memory', 'pairs', 'pacman', 'asteroid', 'meteor', 'dodge', 'whack',
+  'mole', 'zap', 'runner', 'platform', 'minesweeper', 'simon', 'sokoban', 'reversi', 'checkers',
+  'chess', 'wordle', 'hangman', 'sudoku', 'plinko', 'slots', 'blaster', 'hockey', 'mastermind'];
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+let BUILTIN_NAMES = [];
+let EXISTING_CARTS = [];   // [{id, name}] sample carts in tools/carts
+function setBuiltinNames(list) { BUILTIN_NAMES = Array.from(new Set(list.map(s => s.trim()).filter(Boolean))).sort(); }
+function parseBuiltinText(txt) {
+  return txt.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+}
+function collisionCheck(name, blurb) {
+  const errs = [], warns = [];
+  const n = norm(name);
+  for (const b of BUILTIN_NAMES) {
+    const bn = norm(b);
+    if (!bn) continue;
+    if (n === bn || (bn.length >= 4 && n.includes(bn)) || (n.length >= 4 && bn.includes(n)))
+      errs.push('name "' + name + '" collides with built-in game "' + b + '"');
+  }
+  const nb = norm(blurb || '');
+  for (const w of GENRE_WORDS) {
+    if (n.includes(w)) errs.push('name "' + name + '" uses genre keyword "' + w + '" (a built-in game already covers that genre)');
+    else if (nb.includes(w)) warns.push('blurb of "' + name + '" mentions genre keyword "' + w + '" (a built-in game covers it)');
+  }
+  return [errs, warns];
+}
+// cart file id (the .arc file name without extension)
+function idCheck(id, name) {
+  const errs = [], warns = [];
+  if (!id) errs.push('file ID is empty');
+  else {
+    if (!/^[a-z0-9_]+$/.test(id)) errs.push('file ID may only use a-z, 0-9 and _');
+    if ((id + '.arc').length >= 20) errs.push('file name "' + id + '.arc" must be under 20 characters (ID max 15)');
+    const ni = norm(id);
+    for (const b of BUILTIN_NAMES) {
+      const bn = norm(b);
+      if (bn && ni === bn) errs.push('file ID "' + id + '" equals built-in game "' + b + '"');
+    }
+    for (const c of EXISTING_CARTS) {
+      if (c.id === id) warns.push('file ID "' + id + '" is the same as the sample cartridge "' + c.name + '": copying it to the drive would overwrite that cart');
+      else if (norm(c.name) === norm(name)) warns.push('name equals sample cartridge "' + c.name + '"');
+    }
+  }
+  return [errs, warns];
+}
+
+// ---------------- VM ----------------
+const FONT5X7 = '0000000000' + '00005F0000' + '0007000700' + '147F147F14' + '242A7F2A12' + '2313086462' + '3649562050' + '0005030000' +
+  '001C224100' + '0041221C00' + '2A1C7F1C2A' + '08083E0808' + '0050300000' + '0808080808' + '0060600000' + '2010080402' +
+  '3E5149453E' + '00427F4000' + '7249494946' + '2141494D33' + '1814127F10' + '2745454539' + '3C4A494931' + '4121110907' +
+  '3649494936' + '464949291E' + '0000140000' + '0040340000' + '0008142241' + '1414141414' + '0041221408' + '0201590906' +
+  '3E415D594E' + '7C1211127C' + '7F49494936' + '3E41414122' + '7F4141413E' + '7F49494941' + '7F09090901' + '3E41415173' +
+  '7F0808087F' + '00417F4100' + '2040413F01' + '7F08142241' + '7F40404040' + '7F021C027F' + '7F0408107F' + '3E4141413E' +
+  '7F09090906' + '3E4151215E' + '7F09192946' + '2649494932' + '03017F0103' + '3F4040403F' + '1F2040201F' + '3F4038403F' +
+  '6314081463' + '0304780403' + '6159494D43' + '007F414141' + '0204081020' + '004141417F' + '0402010204' + '4040404040' +
+  '0003070800' +
+  '2054547840' + '7F28444438' + '3844444428' + '384444287F' + '3854545418' + '00087E0902' + '18A4A49C78' + '7F08040478' +
+  '00447D4000' + '2040403D00' + '7F10284400' + '00417F4000' + '7C04780478' + '7C08040478' + '3844444438' + 'FC18242418' +
+  '18242418FC' + '7C08040408' + '4854545424' + '04043F4424' + '3C4040207C' + '1C2040201C' + '3C4030403C' +
+  '4428102844' + '4C9090907C' + '4464544C44' + '0008364100' + '0000770000' + '0041360800' + '0201020402';
+const FONT = (function () {
+  const out = [];
+  for (let i = 0; i < FONT5X7.length; i += 10) {
+    const col = [];
+    for (let k = 0; k < 5; k++) col.push(parseInt(FONT5X7.substr(i + k * 2, 2), 16));
+    out.push(col);
+  }
+  return out;
+})();
+
+class Cart {
+  constructor(blob) {
+    if (blob.length < R.HDR_SIZE || blob[0] !== 0x41 || blob[1] !== 0x52 || blob[2] !== 0x43 || blob[3] !== 0x31 || blob[4] !== 1) throw new CartError('bad header');
+    const dv = new DataView(blob.buffer, blob.byteOffset, blob.byteLength);
+    this.flags = blob[5]; this.version = blob[6]; this.nspr = blob[7];
+    this.codeLen = dv.getUint16(8, true); this.strLen = dv.getUint16(10, true); this.memWords = dv.getUint16(12, true);
+    this.memInitN = dv.getUint16(14, true); this.initAddr = dv.getUint16(16, true); this.frameAddr = dv.getUint16(18, true);
+    this.checksum = dv.getUint32(20, true); this.nglobals = blob[24]; this.color = blob[25];
+    const cstr = (a, b) => { let s = ''; for (let i = a; i < b && blob[i]; i++) s += String.fromCharCode(blob[i]); return s; };
+    this.name = cstr(32, 48); this.blurb = cstr(48, 72); this.author = cstr(72, 88);
+    this.tiers = [0, 1, 2, 3].map(i => cstr(88 + i * 8, 96 + i * 8));
+    this.icon = Array.from(blob.slice(120, 128));
+    this.help = [0, 1, 2].map(i => cstr(128 + i * 24, 152 + i * 24));
+    const pay = blob.slice(R.HDR_SIZE);
+    if (pay.length !== this.codeLen + this.strLen + this.nspr * 8 + this.memInitN * 2) throw new CartError('size mismatch');
+    if (fnv1a(pay) !== this.checksum) throw new CartError('bad checksum');
+    if (this.codeLen > R.CODE_MAX || this.strLen > R.STR_MAX || this.nspr > R.SPR_MAX || this.memWords > R.MEM_MAX ||
+      this.memInitN > this.memWords || this.nglobals > R.GLOBALS_MAX) throw new CartError('limits');
+    let o = 0;
+    this.code = pay.slice(o, o + this.codeLen); o += this.codeLen;
+    this.strs = pay.slice(o, o + this.strLen); o += this.strLen;
+    this.sprites = [];
+    for (let i = 0; i < this.nspr; i++) { this.sprites.push(Array.from(pay.slice(o, o + 8))); o += 8; }
+    this.meminit = [];
+    for (let i = 0; i < this.memInitN; i++) { this.meminit.push(((pay[o + i * 2] | (pay[o + i * 2 + 1] << 8)) << 16) >> 16); }
+    this.twoPlayer = !!(this.flags & 1);
+    this.lowerBetter = !!(this.flags & 2);
+  }
+}
+
+class VM {
+  constructor(cart, opts = {}) {
+    this.cart = cart;
+    this.tier = (opts.tier || 0) & 3;
+    this.playerNo = opts.player || 1;
+    this.twop = !!opts.twop;
+    this.best = opts.best === undefined ? -1 : opts.best;
+    this.rng = (opts.seed === undefined ? 0x12345678 : opts.seed) >>> 0;
+    this.fb = new Uint16Array(R.SW * R.SH);
+    this.particles = [];
+    this.onSound = opts.onSound || null;
+    this.reset();
+  }
+  reset() {
+    const c = this.cart;
+    this.g = new Array(R.GLOBALS_MAX).fill(0);
+    this.mem = new Array(Math.max(c.memWords, 1)).fill(0);
+    c.meminit.forEach((v, i) => { this.mem[i] = v; });
+    this.stack = [];
+    this.lstk = new Array(R.LOCALS_MAX).fill(0);
+    this.lsp = 0; this.fp = 0; this.calls = []; this.pc = 0;
+    this.phase = 0; this.suspended = false;
+    this.scoreV = 0; this.over = false; this.overHead = null;
+    this.frameNo = 0; this.tsz = 1;
+    this.pal = new Array(8).fill(PALETTE[1]);
+    this.save = new Array(16).fill(0);
+    this.held = 0; this.pressed = 0; this.maxOps = 0; this.lastOps = 0;
+    this.sounds = [];
+    this.shakeMs = 0;
+    this.startEntry(c.initAddr);
+  }
+  startEntry(addr) { this.pc = addr; this.stack = []; this.lsp = 0; this.fp = 0; this.calls = []; }
+  err(msg) { throw new CartError(msg + ' at pc=' + this.pc); }
+  color(v) { v &= 0xFFFF; return v < 16 ? PALETTE[v] : v; }
+  string(off) {
+    const s = this.cart.strs;
+    if (off < 0 || off >= s.length) this.err('bad string');
+    let e = off;
+    while (e < s.length && s[e] !== 0) e++;
+    if (e >= s.length) this.err('bad string');
+    let r = '';
+    for (let i = off; i < e; i++) r += String.fromCharCode(s[i]);
+    return r;
+  }
+  px(x, y, c) { if (x >= 0 && x < R.SW && y >= 0 && y < R.SH) this.fb[y * R.SW + x] = c; }
+  fillrect(x, y, w, h, c) {
+    const y0 = Math.max(y, 0), y1 = Math.min(y + h, R.SH), x0 = Math.max(x, 0), x1 = Math.min(x + w, R.SW);
+    for (let yy = y0; yy < y1; yy++) { const row = yy * R.SW; for (let xx = x0; xx < x1; xx++) this.fb[row + xx] = c; }
+  }
+  line(x0, y0, x1, y1, c) {
+    if (Math.max(Math.abs(x0), Math.abs(y0), Math.abs(x1), Math.abs(y1)) > 512) return;
+    const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let e = dx + dy, n = 0;
+    while (n < 2000) {
+      this.px(x0, y0, c);
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * e;
+      if (e2 >= dy) { e += dy; x0 += sx; }
+      if (e2 <= dx) { e += dx; y0 += sy; }
+      n++;
+    }
+  }
+  circle(cx, cy, r, c, fill) {
+    if (r < 0 || r > 127) return;
+    for (let yy = -r; yy <= r; yy++) for (let xx = -r; xx <= r; xx++) {
+      const d = xx * xx + yy * yy;
+      if ((fill && d <= r * r + (r >> 1)) || (!fill && Math.abs(d - r * r) <= r)) this.px(cx + xx, cy + yy, c);
+    }
+  }
+  text(x, y, c, s) {
+    const sz = this.tsz;
+    for (let i = 0; i < s.length; i++) {
+      const code = s.charCodeAt(i);
+      const gl = (code >= 32 && code <= 126) ? FONT[code - 32] : null;
+      if (!gl) { if (code !== 32) this.fillrect(x + i * 6 * sz, y, 5 * sz, 7 * sz, c); continue; }
+      for (let col = 0; col < 5; col++) for (let row = 0; row < 7; row++) {
+        if ((gl[col] >> row) & 1) {
+          if (sz === 1) this.px(x + i * 6 + col, y + row, c);
+          else this.fillrect(x + (i * 6 + col) * sz, y + row * sz, sz, sz, c);
+        }
+      }
+    }
+  }
+  sprite(x, y, idx, c, flags = 0) {
+    const sp = this.cart.sprites;
+    if (idx < 0 || idx >= sp.length) this.err('bad sprite');
+    const sc = (flags & 4) ? 2 : 1;
+    for (let r = 0; r < 8; r++) {
+      const row = sp[idx][(flags & 2) ? 7 - r : r];
+      for (let cc = 0; cc < 8; cc++) {
+        const bit = (flags & 1) ? (0x01 << cc) : (0x80 >> cc);
+        if (row & bit) {
+          if (sc === 1) this.px(x + cc, y + r, c);
+          else this.fillrect(x + cc * 2, y + r * 2, 2, 2, c);
+        }
+      }
+    }
+  }
+  // one display frame; buttons bit0 L,1 R,2 U,3 D,4 A,5 B
+  frame(buttons = 0) {
+    if (this.over) return;
+    this.pressed = buttons & ~this.held;
+    this.held = buttons;
+    this.frameNo++;
+    if (!this.suspended && this.phase === 1) this.startEntry(this.cart.frameAddr);
+    this.suspended = false;
+    const ops = this.run();
+    this.lastOps = ops;
+    this.maxOps = Math.max(this.maxOps, ops);
+    // particles
+    for (const p of this.particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; }
+    this.particles = this.particles.filter(p => p.life > 0);
+    if (this.shakeMs > 0) this.shakeMs = Math.max(0, this.shakeMs - 33);
+  }
+  pop() { if (!this.stack.length) this.err('stack underflow'); return this.stack.pop(); }
+  pushv(v) { if (this.stack.length >= R.STACK_MAX) this.err('stack overflow'); this.stack.push(w16(v)); }
+  memAddr(a) { if (a < 0 || a >= this.cart.memWords) this.err('mem out of range'); return a; }
+  need(k) { if (this.pc + k > this.cart.code.length) this.err('truncated operand'); }
+  codeByte() { return this.cart.code[this.pc++]; }
+  run() {
+    const code = this.cart.code, n = code.length;
+    let ops = 0;
+    for (; ;) {
+      ops++;
+      if (ops > R.BUDGET) this.err('cart too slow');
+      if (this.pc < 0 || this.pc >= n) this.err('pc out of range');
+      const op = code[this.pc++];
+      if (op === 1) { this.need(1); const v = code[this.pc++]; this.pushv(v > 127 ? v - 256 : v); }
+      else if (op === 2) { this.need(2); const v = code[this.pc] | (code[this.pc + 1] << 8); this.pc += 2; this.pushv(w16(v)); }
+      else if (op === 3) { const a = this.pop(); this.pushv(a); this.pushv(a); }
+      else if (op === 4) this.pop();
+      else if (op === 5) { const b = this.pop(), a = this.pop(); this.pushv(b); this.pushv(a); }
+      else if (op === 6) { const b = this.pop(), a = this.pop(); this.pushv(a); this.pushv(b); this.pushv(a); }
+      else if (op >= 10 && op <= 34) {
+        if (op === 15 || op === 19 || op === 22 || op === 31 || op === 34) {
+          const a = this.pop();
+          this.pushv(op === 15 ? -a : op === 19 ? ~a : op === 22 ? +(a === 0) : op === 31 ? Math.abs(a) : Math.sign(a));
+        } else if (op === 33) {
+          const hi = this.pop(), lo = this.pop(), v = this.pop();
+          this.pushv(v < lo ? lo : v > hi ? hi : v);
+        } else {
+          const b = this.pop(), a = this.pop();
+          let r;
+          if (op === 10) r = a + b;
+          else if (op === 11) r = a - b;
+          else if (op === 12) r = a * b;
+          else if (op === 13) r = b === 0 ? 0 : Math.floor(Math.abs(a) / Math.abs(b)) * ((a < 0) === (b < 0) ? 1 : -1);
+          else if (op === 14) r = b === 0 ? 0 : a - b * (Math.floor(Math.abs(a) / Math.abs(b)) * ((a < 0) === (b < 0) ? 1 : -1));
+          else if (op === 16) r = a & b;
+          else if (op === 17) r = a | b;
+          else if (op === 18) r = a ^ b;
+          else if (op === 20) r = a << (b & 15);
+          else if (op === 21) r = a >> (b & 15);
+          else if (op === 23) r = +(a === b);
+          else if (op === 24) r = +(a !== b);
+          else if (op === 25) r = +(a < b);
+          else if (op === 26) r = +(a <= b);
+          else if (op === 27) r = +(a > b);
+          else if (op === 28) r = +(a >= b);
+          else if (op === 29) r = Math.min(a, b);
+          else if (op === 30) r = Math.max(a, b);
+          else if (op === 32) r = (a * b) >> 8;
+          else this.err('bad opcode ' + op);
+          this.pushv(r);
+        }
+      }
+      else if (op === 40) { this.need(1); const i = this.codeByte(); if (i >= R.GLOBALS_MAX) this.err('global range'); this.pushv(this.g[i]); }
+      else if (op === 41) { this.need(1); const i = this.codeByte(); if (i >= R.GLOBALS_MAX) this.err('global range'); this.g[i] = this.pop(); }
+      else if (op === 42) { this.need(1); const i = this.codeByte(); if (this.fp + i >= R.LOCALS_MAX) this.err('local range'); this.pushv(this.lstk[this.fp + i]); }
+      else if (op === 43) { this.need(1); const i = this.codeByte(); if (this.fp + i >= R.LOCALS_MAX) this.err('local range'); this.lstk[this.fp + i] = this.pop(); }
+      else if (op === 44) { const a = this.pop(); this.pushv(this.mem[this.memAddr(a)]); }
+      else if (op === 45) { const v = this.pop(), a = this.pop(); this.mem[this.memAddr(a)] = v; }
+      else if (op === 50) { this.need(2); this.pc = code[this.pc] | (code[this.pc + 1] << 8); }
+      else if (op === 51 || op === 52) {
+        this.need(2);
+        const t = code[this.pc] | (code[this.pc + 1] << 8); this.pc += 2;
+        const v = this.pop();
+        if ((v === 0) === (op === 51)) this.pc = t;
+      }
+      else if (op === 53) {
+        this.need(4);
+        const t = code[this.pc] | (code[this.pc + 1] << 8);
+        const na = code[this.pc + 2], nl = code[this.pc + 3]; this.pc += 4;
+        if (this.calls.length >= R.CALLS_MAX) this.err('call depth');
+        if (this.lsp + nl > R.LOCALS_MAX || nl < na) this.err('locals overflow');
+        if (this.stack.length < na) this.err('stack underflow');
+        const base = this.lsp;
+        for (let k = 0; k < nl; k++) this.lstk[base + k] = 0;
+        for (let k = na - 1; k >= 0; k--) this.lstk[base + k] = this.pop();
+        this.calls.push([this.pc, this.fp, this.lsp]);
+        this.fp = base; this.lsp = base + nl; this.pc = t;
+      }
+      else if (op === 54) {
+        const rv = this.pop();
+        if (!this.calls.length) {
+          if (this.phase === 0) { this.phase = 1; this.startEntry(this.cart.frameAddr); continue; }
+          return ops;
+        }
+        const f = this.calls.pop();
+        this.pc = f[0]; this.fp = f[1]; this.lsp = f[2];
+        this.pushv(rv);
+      }
+      else if (op === 55) { this.suspended = true; return ops; }
+      else if (op >= 60 && op <= 122) { this.builtin(op); if (this.over) return ops; }
+      else this.err('bad opcode ' + op);
+    }
+  }
+  sound(a) { this.sounds.push(a); if (this.onSound) this.onSound(a); }
+  builtin(op) {
+    const P = () => this.pop();
+    if (op === 60) { const c = this.color(P()); this.fb.fill(c); }
+    else if (op === 61) { const c = this.color(P()), y = P(), x = P(); this.px(x, y, c); }
+    else if (op === 62) { const c = this.color(P()), h = P(), w = P(), y = P(), x = P(); this.fillrect(x, y, w, h, c); }
+    else if (op === 63) {
+      const c = this.color(P()), h = P(), w = P(), y = P(), x = P();
+      if (w > 0 && h > 0) {
+        this.fillrect(x, y, w, 1, c); this.fillrect(x, y + h - 1, w, 1, c);
+        this.fillrect(x, y, 1, h, c); this.fillrect(x + w - 1, y, 1, h, c);
+      }
+    }
+    else if (op === 64) { const c = this.color(P()), y1 = P(), x1 = P(), y0 = P(), x0 = P(); this.line(x0, y0, x1, y1, c); }
+    else if (op === 65 || op === 66) { const c = this.color(P()), r = P(), y = P(), x = P(); this.circle(x, y, r, c, op === 66); }
+    else if (op === 67) { const s = this.string(P()), c = this.color(P()), y = P(), x = P(); this.text(x, y, c, s); }
+    else if (op === 68) { const n = P(), c = this.color(P()), y = P(), x = P(); this.text(x, y, c, String(n)); }
+    else if (op === 69) { const s = this.string(P()), c = this.color(P()), y = P(); this.text(Math.floor((R.SW - s.length * 6 * this.tsz) / 2), y, c, s); }
+    else if (op === 70) { const v = P(); this.tsz = v >= 2 ? 2 : 1; }
+    else if (op === 71) { const c = this.color(P()), i = P(), y = P(), x = P(); this.sprite(x, y, i, c); }
+    else if (op === 72) { const f = P(), c = this.color(P()), i = P(), y = P(), x = P(); this.sprite(x, y, i, c, f); }
+    else if (op === 73) {
+      const oy = P(), ox = P(), h = P(), w = P(), base = P();
+      if (w < 0 || h < 0 || base < 0 || base + w * h > this.cart.memWords) this.err('map out of range');
+      for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+        const v = this.mem[base + yy * w + xx];
+        if (v & 63) this.sprite(ox + xx * 8, oy + yy * 8, (v & 63) - 1, this.pal[(v >> 6) & 7]);
+      }
+    }
+    else if (op === 74) { const c = this.color(P()), i = P(); if (i >= 0 && i < 8) this.pal[i] = c; }
+    else if (op === 75) { const y = P(), x = P(); this.pushv(x >= 0 && x < R.SW && y >= 0 && y < R.SH ? w16(this.fb[y * R.SW + x]) : -1); }
+    else if (op === 76) { const b = P(), g = P(), r = P(); this.pushv(w16(c565(r & 255, g & 255, b & 255))); }
+    else if (op === 77) {
+      const h2 = P(), w2 = P(), y2 = P(), x2 = P(), h1 = P(), w1 = P(), y1 = P(), x1 = P();
+      this.pushv(+(x1 < x2 + w2 && x2 < x1 + w1 && y1 < y2 + h2 && y2 < y1 + h1));
+    }
+    else if (op === 78) {
+      let w = P(); const n = P(), c = this.color(P()), y = P(), x = P();
+      w = Math.max(0, Math.min(w, 8));
+      let s = String(Math.abs(n));
+      while (s.length < w - (n < 0 ? 1 : 0)) s = '0' + s;
+      if (n < 0) s = '-' + s;
+      this.text(x, y, c, s);
+    }
+    else if (op === 85) { const n = P(); this.pushv(+(n >= 0 && n < 6 && ((this.held >> n) & 1))); }
+    else if (op === 86) { const n = P(); this.pushv(+(n >= 0 && n < 6 && ((this.pressed >> n) & 1))); }
+    else if (op === 90) {
+      const n = P();
+      this.rng = (Math.imul(this.rng, 1664525) + 1013904223) >>> 0;
+      this.pushv(n <= 0 ? 0 : ((this.rng >>> 16) & 0x7FFF) % n);
+    }
+    else if (op === 91) this.pushv(this.frameNo & 0x7FFF);
+    else if (op === 92) this.pushv(vmSin(P()));
+    else if (op === 93) this.pushv(vmSin(P() + 64));
+    else if (op === 94) { const n = P(); this.pushv(n <= 0 ? 0 : Math.floor(Math.sqrt(n))); }
+    else if (op === 95) this.rng = (((P() & 0xFFFF) * 40503) + 1) >>> 0;
+    else if (op === 100) { const ms = P(), f = P(); this.sound(['tone', f, ms]); }
+    else if (op === 101) this.sound(['sfx', P()]);
+    else if (op === 102) {
+      const c = this.color(P()), n = P(), y = P(), x = P();
+      for (let i = 0; i < Math.max(0, Math.min(n, 40)); i++) {
+        const a = Math.random() * 6.283, sp = 0.5 + Math.random() * 1.8;
+        this.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.5, life: 10 + Math.floor(Math.random() * 10), c });
+      }
+    }
+    else if (op === 103) { const pw = P(), ms = P(); this.shakeMs = Math.max(0, ms); this.shakePow = pw; }
+    else if (op === 104) { P(); P(); P(); P(); }
+    else if (op === 110) this.scoreV = P();
+    else if (op === 111) this.pushv(Math.max(-32768, Math.min(32767, this.scoreV)));
+    else if (op === 112) { const head = P(); this.overHead = this.string(head); this.over = true; }
+    else if (op === 113) this.pushv(Math.max(-32768, Math.min(32767, this.best)));
+    else if (op === 114) this.pushv(this.tier);
+    else if (op === 115) this.pushv(this.playerNo);
+    else if (op === 116) { const i = P(); this.pushv(this.save[i & 15]); }
+    else if (op === 117) { const v = P(), i = P(); this.save[i & 15] = v & 255; }
+    else if (op === 118) {
+      const v = P(), n = P(), base = P();
+      if (n < 0 || base < 0 || base + n > this.cart.memWords) this.err('memfill range');
+      for (let k = 0; k < n; k++) this.mem[base + k] = v;
+    }
+    else if (op === 119) {
+      const y = P(), x = P(), h = P(), w = P(), base = P();
+      if (w < 0 || h < 0 || base < 0 || base + w * h > this.cart.memWords) this.err('mget range');
+      this.pushv(x >= 0 && x < w && y >= 0 && y < h ? this.mem[base + y * w + x] : -1);
+    }
+    else if (op === 120) {
+      const v = P(), y = P(), x = P(), h = P(), w = P(), base = P();
+      if (w < 0 || h < 0 || base < 0 || base + w * h > this.cart.memWords) this.err('mset range');
+      if (x >= 0 && x < w && y >= 0 && y < h) this.mem[base + y * w + x] = v;
+    }
+    else if (op === 121) this.scoreV += P();
+    else if (op === 122) this.pushv(+this.twop);
+    else this.err('bad opcode ' + op);
+  }
+}
+// run a cart headlessly. bot(frameNo, vm) -> button mask. Throws CartError on a fault.
+function runCart(blob, frames, bot, opts) {
+  const vm = new VM(new Cart(blob), opts || {});
+  vm.frame(0);
+  for (let f = 0; f < frames; f++) {
+    if (vm.over) break;
+    vm.frame(bot ? bot(f, vm) : 0);
+  }
+  return vm;
+}
+
+// ===== Block catalogue + blocks -> ARCL compiler =====
+const CATS = [
+  { id: 'events', name: 'Events', color: '#E6A800' },
+  { id: 'motion', name: 'Motion', color: '#4C7FE8' },
+  { id: 'looks', name: 'Looks', color: '#9966FF' },
+  { id: 'sound', name: 'Sound', color: '#CF63CF' },
+  { id: 'control', name: 'Control', color: '#F29A12' },
+  { id: 'sensing', name: 'Sensing', color: '#3AA9D0' },
+  { id: 'ops', name: 'Operators', color: '#4DAF4D' },
+  { id: 'platform', name: 'Platformer', color: '#2E9E8F' },
+  { id: 'vars', name: 'Variables', color: '#EE7D18' },
+  { id: 'game', name: 'Game', color: '#D9434B' }
+];
+const BTN_OPTS = [['left', 'LEFT'], ['right', 'RIGHT'], ['up', 'UP'], ['down', 'DOWN'], ['A', 'A'], ['B', 'B']];
+const FLIP_OPTS = [['normal', '0'], ['flip left-right', '1'], ['flip up-down', '2'], ['flip both', '3'], ['double size', '4']];
+const SFX_OPTS = [['blip', '0'], ['select', '1'], ['win', '2'], ['crash', '3'], ['coin', '4'], ['laser', '5'], ['low', '6'], ['jump', '7']];
+const NOTE_OPTS = [['C4', '262'], ['D4', '294'], ['E4', '330'], ['F4', '349'], ['G4', '392'], ['A4', '440'], ['B4', '494'],
+  ['C5', '523'], ['D5', '587'], ['E5', '659'], ['F5', '698'], ['G5', '784'], ['A5', '880'], ['C6', '1047']];
+const DIR_OPTS = [['left & right', 'h'], ['up & down', 'v'], ['all four ways', 'hv']];
+const MATH_OPTS = [['+', '+'], ['−', '-'], ['×', '*'], ['÷', '/'], ['mod', '%']];
+const CMP_OPTS = [['<', '<'], ['≤', '<='], ['=', '=='], ['≠', '!='], ['≥', '>='], ['>', '>']];
+const SIZE_OPTS = [['small', '1'], ['big', '2']];
+
+const N = d => ({ t: 'num', d: String(d === undefined ? 0 : d) });
+const CL = d => ({ t: 'color', d: d || 'WHITE' });
+const SP = { t: 'sprite' };
+const VR = { t: 'var' };
+const BO = { t: 'bool', d: '' };
+const TX = d => ({ t: 'text', d: d || '' });
+const BT = d => ({ t: 'opt', opts: BTN_OPTS, d: d || 'A' });
+const MS = { t: 'msg' };
+const OP = (opts, d) => ({ t: 'opt', opts, d: d === undefined ? opts[0][1] : d });
+
+const DEFS = {};
+const DEF_ORDER = [];
+function def(id, cat, shape, label, args, gen, extra) {
+  const d = Object.assign({ id, cat, shape, label, args: args || [], gen }, extra || {});
+  DEFS[id] = d; DEF_ORDER.push(id);
+  return d;
+}
+const ind = s => s.split('\n').map(l => l ? '  ' + l : l).join('\n');
+const blockOf = (head, body) => head + ' {\n' + (body ? ind(body) + '\n' : '') + '}';
+
+// ---- Events ----
+def('h_start', 'events', 'hat', 'when game starts', [], null, { hatKind: 'start' });
+def('h_frame', 'events', 'hat', 'every frame', [], null, { hatKind: 'frame' });
+def('h_btnp', 'events', 'hat', 'when %1 is pressed', [BT('A')], A => `btnp(${A[0]})`, { hatKind: 'event' });
+def('h_btn', 'events', 'hat', 'while %1 is held', [BT('LEFT')], A => `btn(${A[0]})`, { hatKind: 'event' });
+def('h_touch', 'events', 'hat', 'when %1 touches %2', [SP, SP], (A, X) => X.touch(A[0], A[1]), { hatKind: 'event' });
+def('h_edge', 'events', 'hat', 'when %1 hits the edge', [SP], (A, X) => X.edge(A[0]), { hatKind: 'event' });
+def('h_msg', 'events', 'hat', 'when I receive %1', [MS], (A, X) => `(${X.msgVar(A[0])} == 1)`, { hatKind: 'event' });
+def('e_bcast', 'events', 'stack', 'broadcast %1', [MS], (A, X) => `${X.msgVar(A[0])} = 2;`);
+
+// ---- Motion ----
+def('m_move', 'motion', 'stack', 'move %1 by x %2 y %3', [SP, N(2), N(0)], (A, X) =>
+  `${X.sv(A[0], 'x')} += ${A[1]};\n${X.sv(A[0], 'y')} += ${A[2]};`);
+def('m_setx', 'motion', 'stack', 'set %1 x to %2', [SP, N(80)], (A, X) => `${X.sv(A[0], 'x')} = ${A[1]};`);
+def('m_sety', 'motion', 'stack', 'set %1 y to %2', [SP, N(60)], (A, X) => `${X.sv(A[0], 'y')} = ${A[1]};`);
+def('m_goto', 'motion', 'stack', 'put %1 at x %2 y %3', [SP, N(80), N(60)], (A, X) =>
+  `${X.sv(A[0], 'x')} = ${A[1]};\n${X.sv(A[0], 'y')} = ${A[2]};`);
+def('m_setvel', 'motion', 'stack', 'set %1 speed to x %2 y %3', [SP, N(2), N(1)], (A, X) =>
+  `${X.sv(A[0], 'vx')} = ${A[1]};\n${X.sv(A[0], 'vy')} = ${A[2]};`);
+def('m_vel', 'motion', 'stack', 'move %1 by its speed', [SP], (A, X) =>
+  `${X.sv(A[0], 'x')} += ${X.sv(A[0], 'vx')};\n${X.sv(A[0], 'y')} += ${X.sv(A[0], 'vy')};`);
+def('m_bounce', 'motion', 'stack', 'bounce %1 off the edges', [SP], (A, X) => {
+  const x = X.sv(A[0], 'x'), y = X.sv(A[0], 'y'), vx = X.sv(A[0], 'vx'), vy = X.sv(A[0], 'vy');
+  return `if (${x} < 0) { ${x} = 0; ${vx} = abs(${vx}); }\nif (${x} > 152) { ${x} = 152; ${vx} = 0 - abs(${vx}); }\n` +
+    `if (${y} < 0) { ${y} = 0; ${vy} = abs(${vy}); }\nif (${y} > 120) { ${y} = 120; ${vy} = 0 - abs(${vy}); }`;
+});
+def('m_keep', 'motion', 'stack', 'keep %1 on screen', [SP], (A, X) =>
+  `${X.sv(A[0], 'x')} = clamp(${X.sv(A[0], 'x')}, 0, 152);\n${X.sv(A[0], 'y')} = clamp(${X.sv(A[0], 'y')}, 0, 120);`);
+def('m_dpad', 'motion', 'stack', 'move %1 with D-pad %2 speed %3', [SP, OP(DIR_OPTS, 'h'), N(2)], (A, X) => {
+  const x = X.sv(A[0], 'x'), y = X.sv(A[0], 'y');
+  const o = ['var _sp = ' + A[2] + ';'];
+  if (A[1].includes('h')) o.push(`if (btn(LEFT)) { ${x} -= _sp; }`, `if (btn(RIGHT)) { ${x} += _sp; }`);
+  if (A[1].includes('v')) o.push(`if (btn(UP)) { ${y} -= _sp; }`, `if (btn(DOWN)) { ${y} += _sp; }`);
+  return o.join('\n');
+});
+def('m_toward', 'motion', 'stack', 'move %1 toward %2 by %3', [SP, SP, N(1)], (A, X) =>
+  `var _sp = ${A[2]};\n${X.sv(A[0], 'x')} += clamp(${X.sv(A[1], 'x')} - ${X.sv(A[0], 'x')}, 0 - _sp, _sp);\n` +
+  `${X.sv(A[0], 'y')} += clamp(${X.sv(A[1], 'y')} - ${X.sv(A[0], 'y')}, 0 - _sp, _sp);`);
+def('r_x', 'motion', 'rep', 'x of %1', [SP], (A, X) => X.sv(A[0], 'x'));
+def('r_y', 'motion', 'rep', 'y of %1', [SP], (A, X) => X.sv(A[0], 'y'));
+def('r_vx', 'motion', 'rep', 'x speed of %1', [SP], (A, X) => X.sv(A[0], 'vx'));
+def('r_vy', 'motion', 'rep', 'y speed of %1', [SP], (A, X) => X.sv(A[0], 'vy'));
+
+// ---- Looks ----
+def('l_draw', 'looks', 'stack', 'draw %1 at x %2 y %3 colour %4 %5', [SP, N(80), N(60), CL('WHITE'), OP(FLIP_OPTS, '0')], (A, X) =>
+  A[4] === '0' ? `spr(${A[1]}, ${A[2]}, ${X.sc(A[0])}, ${A[3]});` : `sprf(${A[1]}, ${A[2]}, ${X.sc(A[0])}, ${A[3]}, ${A[4]});`);
+def('l_drawat', 'looks', 'stack', 'draw %1 where it is', [SP], (A, X) => X.drawSprite(A[0]));
+def('l_show', 'looks', 'stack', 'show %1', [SP], (A, X) => `${X.sv(A[0], 'vis')} = 1;`);
+def('l_hide', 'looks', 'stack', 'hide %1', [SP], (A, X) => `${X.sv(A[0], 'vis')} = 0;`);
+def('l_setcol', 'looks', 'stack', 'set %1 colour to %2', [SP, CL('YELLOW')], (A, X) => `${X.sv(A[0], 'col')} = ${A[1]};`);
+def('l_flip', 'looks', 'stack', 'set %1 look to %2', [SP, OP(FLIP_OPTS, '0')], (A, X) => `${X.sv(A[0], 'fl')} = ${A[1]};`);
+def('l_text', 'looks', 'stack', 'write %1 at x %2 y %3 colour %4', [TX('HELLO'), N(10), N(10), CL('WHITE')], (A, X, b) => {
+  const lit = X.textLen(b.a[0]);
+  return X.hud(A[1], A[2], lit * 6 * X.tsz(), 7 * X.tsz(), (x, y) => `text(${x}, ${y}, ${A[3]}, ${A[0]});`);
+});
+def('l_ctext', 'looks', 'stack', 'write %1 centred at y %2 colour %3', [TX('GAME'), N(60), CL('WHITE')], (A, X) =>
+  X.hud('0', A[1], 160, 7 * X.tsz(), (x, y) => `ctext(${y}, ${A[2]}, ${A[0]});`));
+def('l_num', 'looks', 'stack', 'show number %1 at x %2 y %3 colour %4 digits %5', [N(0), N(4), N(4), CL('WHITE'), N(0)], (A, X) => {
+  const wpx = 6 * 6 * X.tsz();
+  return X.hud(A[1], A[2], wpx, 7 * X.tsz(), (x, y) =>
+    A[4] === '0' ? `num(${x}, ${y}, ${A[3]}, ${A[0]});` : `numw(${x}, ${y}, ${A[3]}, ${A[0]}, ${A[4]});`);
+});
+def('l_size', 'looks', 'stack', 'set text size to %1', [OP(SIZE_OPTS, '1')], (A, X) => { X.usesTsize = true; return `tsize(${A[0]});`; });
+def('l_cls', 'looks', 'stack', 'clear screen to %1', [CL('BLACK')], A => `cls(${A[0]});`);
+def('l_bg', 'looks', 'stack', 'set background colour to %1', [CL('NAVY')], A => `bgc = ${A[0]};`);
+def('l_rect', 'looks', 'stack', 'fill box x %1 y %2 w %3 h %4 colour %5', [N(10), N(10), N(20), N(10), CL('RED')], A =>
+  `rect(${A[0]}, ${A[1]}, ${A[2]}, ${A[3]}, ${A[4]});`);
+def('l_box', 'looks', 'stack', 'outline box x %1 y %2 w %3 h %4 colour %5', [N(10), N(10), N(20), N(10), CL('WHITE')], A =>
+  `box(${A[0]}, ${A[1]}, ${A[2]}, ${A[3]}, ${A[4]});`);
+def('l_line', 'looks', 'stack', 'line from x %1 y %2 to x %3 y %4 colour %5', [N(0), N(0), N(159), N(127), CL('WHITE')], A =>
+  `line(${A[0]}, ${A[1]}, ${A[2]}, ${A[3]}, ${A[4]});`);
+def('l_circ', 'looks', 'stack', '%1 circle x %2 y %3 radius %4 colour %5', [OP([['filled', 'disc'], ['outline', 'circ']], 'disc'), N(80), N(64), N(10), CL('YELLOW')], A =>
+  `${A[0]}(${A[1]}, ${A[2]}, ${A[3]}, ${A[4]});`);
+def('l_pix', 'looks', 'stack', 'set pixel x %1 y %2 to %3', [N(80), N(64), CL('WHITE')], A => `pix(${A[0]}, ${A[1]}, ${A[2]});`);
+def('l_burst', 'looks', 'stack', 'sparkle at x %1 y %2 amount %3 colour %4', [N(80), N(60), N(12), CL('YELLOW')], A =>
+  `burst(${A[0]}, ${A[1]}, ${A[2]}, ${A[3]});`);
+def('l_shake', 'looks', 'stack', 'shake screen %1 ms power %2', [N(200), N(2)], A => `shake(${A[0]}, ${A[1]});`);
+def('l_led', 'looks', 'stack', 'light LED red %1 green %2 blue %3 for %4 ms', [N(255), N(0), N(0), N(300)], A =>
+  `led(${A[0]}, ${A[1]}, ${A[2]}, ${A[3]});`);
+def('r_rgb', 'looks', 'rep', 'colour red %1 green %2 blue %3', [N(255), N(128), N(0)], A => `rgb(${A[0]}, ${A[1]}, ${A[2]})`);
+def('r_pixel', 'looks', 'rep', 'colour at x %1 y %2', [N(80), N(64)], A => `getpix(${A[0]}, ${A[1]})`);
+
+// ---- Sound ----
+def('s_sfx', 'sound', 'stack', 'play sound %1', [OP(SFX_OPTS, '0')], A => `sfx(${A[0]});`);
+def('s_tone', 'sound', 'stack', 'beep pitch %1 Hz for %2 ms', [N(440), N(100)], A => `tone(${A[0]}, ${A[1]});`);
+def('s_note', 'sound', 'stack', 'play note %1 for %2 ms', [OP(NOTE_OPTS, '440'), N(150)], A => `tone(${A[0]}, ${A[1]});`);
+
+// ---- Control ----
+def('c_waitf', 'control', 'stack', 'wait %1 frames', [N(30)], (A, X) => X.wait('f', A[0]));
+def('c_waits', 'control', 'stack', 'wait %1 seconds', [N(1)], (A, X) => X.wait('f', `(${A[0]}) * 30`));
+def('c_until', 'control', 'stack', 'wait until %1', [BO], (A, X) => X.wait('u', A[0]));
+def('c_repeat', 'control', 'c', 'repeat %1', [N(10)], (A, X, b) => {
+  const d = X.depth++; const body = X.body(b, 0); X.depth--;
+  return blockOf(`var _n${d} = ${A[0]};\nfor (var _i${d} = 0; _i${d} < _n${d}; _i${d}++)`, body);
+});
+def('c_forever', 'control', 'c', 'forever', [], (A, X, b) => {
+  if (!X.canEnd(b.c[0] || [])) X.err('"forever" never ends here: put an "exit loop", "stop this script", "win" or "lose" inside it (or use it in a "when game starts" script with a wait)');
+  X.depth++; const body = X.body(b, 0); X.depth--;
+  return blockOf('while (1)', body);
+});
+def('c_while', 'control', 'c', 'while %1', [BO], (A, X, b) => {
+  X.depth++; const body = X.body(b, 0); X.depth--;
+  return blockOf(`while (${A[0]})`, body);
+});
+def('c_runtil', 'control', 'c', 'repeat until %1', [BO], (A, X, b) => {
+  X.depth++; const body = X.body(b, 0); X.depth--;
+  return blockOf(`while (!(${A[0]}))`, body);
+});
+def('c_for', 'control', 'c', 'for %1 from %2 to %3', [VR, N(0), N(9)], (A, X, b) => {
+  const d = X.depth++; const body = X.body(b, 0); X.depth--;
+  const v = X.gvar(A[0]);
+  return blockOf(`var _e${d} = ${A[2]};\nfor (${v} = ${A[1]}; ${v} <= _e${d}; ${v}++)`, body);
+});
+def('c_if', 'control', 'c', 'if %1 then', [BO], (A, X, b) => blockOf(`if (${A[0]})`, X.body(b, 0)));
+def('c_ifelse', 'control', 'c2', 'if %1 then', [BO], (A, X, b) => {
+  const t = X.body(b, 0), e = X.body(b, 1);
+  return `if (${A[0]}) {\n${t ? ind(t) + '\n' : ''}} else {\n${e ? ind(e) + '\n' : ''}}`;
+}, { label2: 'else' });
+def('c_break', 'control', 'stack', 'exit loop', [], (A, X) => { if (!X.inLoop()) X.err('"exit loop" must be inside a loop'); return 'break;'; });
+def('c_stop', 'control', 'stack', 'stop this script', [], (A, X) => X.stopStmt());
+
+// ---- Sensing ----
+def('q_btn', 'sensing', 'bool', 'button %1 held?', [BT('A')], A => `btn(${A[0]})`);
+def('q_btnp', 'sensing', 'bool', 'button %1 just pressed?', [BT('A')], A => `btnp(${A[0]})`);
+def('q_touch', 'sensing', 'bool', '%1 touching %2?', [SP, SP], (A, X) => X.touch(A[0], A[1]));
+def('q_edge', 'sensing', 'bool', '%1 at the edge?', [SP], (A, X) => X.edge(A[0]));
+def('q_box', 'sensing', 'bool', '%1 touching box x %2 y %3 w %4 h %5?', [SP, N(0), N(100), N(160), N(8)], (A, X) =>
+  `hit(${X.sv(A[0], 'x')} + 1, ${X.sv(A[0], 'y')} + 1, 6, 6, ${A[1]}, ${A[2]}, ${A[3]}, ${A[4]})`);
+def('q_rnd', 'sensing', 'rep', 'random from %1 to %2', [N(0), N(9)], (A, X) => { X.usesRR = true; return `rr(${A[0]}, ${A[1]})`; });
+def('q_timer', 'sensing', 'rep', 'frame counter', [], () => 'frames()');
+def('q_tier', 'sensing', 'rep', 'difficulty (0-3)', [], () => 'tier()');
+def('q_hi', 'sensing', 'rep', 'high score', [], () => 'hiscore()');
+def('q_player', 'sensing', 'rep', 'player number', [], () => 'player()');
+def('q_twop', 'sensing', 'bool', 'two-player mode?', [], () => 'twop()');
+
+// ---- Operators ----
+def('o_math', 'ops', 'rep', '%1 %2 %3', [N(0), OP(MATH_OPTS, '+'), N(0)], A => `(${A[0]} ${A[1]} ${A[2]})`);
+def('o_cmp', 'ops', 'bool', '%1 %2 %3', [N(0), OP(CMP_OPTS, '<'), N(0)], A => `(${A[0]} ${A[1]} ${A[2]})`);
+def('o_and', 'ops', 'bool', '%1 and %2', [BO, BO], A => `(${A[0]} && ${A[1]})`);
+def('o_or', 'ops', 'bool', '%1 or %2', [BO, BO], A => `(${A[0]} || ${A[1]})`);
+def('o_not', 'ops', 'bool', 'not %1', [BO], A => `(!${A[0]})`);
+def('o_minmax', 'ops', 'rep', '%1 of %2 and %3', [OP([['smaller', 'min'], ['bigger', 'max']], 'min'), N(0), N(0)], A => `${A[0]}(${A[1]}, ${A[2]})`);
+def('o_abs', 'ops', 'rep', 'absolute value of %1', [N(0)], A => `abs(${A[0]})`);
+def('o_clamp', 'ops', 'rep', 'keep %1 between %2 and %3', [N(0), N(0), N(10)], A => `clamp(${A[0]}, ${A[1]}, ${A[2]})`);
+def('o_trig', 'ops', 'rep', '%1 of angle %2 (0-255)', [OP([['sin', 'sin'], ['cos', 'cos']], 'sin'), N(0)], A => `${A[0]}(${A[1]})`);
+def('o_sqrt', 'ops', 'rep', 'square root of %1', [N(16)], A => `sqrt(${A[0]})`);
+
+// ---- Platformer physics (uses the tile layer painted in the Level tab) ----
+def('p_move', 'platform', 'stack', 'move %1 left/right with platform collision, speed %2', [SP, N(2)], (A, X) => {
+  X.usesTiles = true;
+  const x = X.sv(A[0], 'x'), y = X.sv(A[0], 'y');
+  return `var _k = ${A[1]};
+var _d = btn(RIGHT) - btn(LEFT);
+while (_k > 0 && _d != 0) {
+  var _e = ${x} + _d + (_d > 0 ? 6 : 1);
+  if (solid(_e, ${y}) || solid(_e, ${y} + 7)) { break; }
+  ${x} += _d;
+  _k -= 1;
+}
+${x} = clamp(${x}, 0, 152);`;
+});
+def('p_gravity', 'platform', 'stack', 'apply gravity to %1 (fall, land on platforms)', [SP], (A, X) => {
+  X.usesTiles = true;
+  const x = X.sv(A[0], 'x'), y = X.sv(A[0], 'y'), vy = X.sv(A[0], 'vy'), g = X.sv(A[0], 'gnd');
+  return `${vy} = min(${vy} + 1, 6);
+${g} = 0;
+var _k = abs(${vy});
+var _s = sign(${vy});
+while (_k > 0) {
+  if (_s > 0) {
+    if (solid(${x} + 1, ${y} + 8) || solid(${x} + 6, ${y} + 8)) { ${vy} = 0; ${g} = 1; break; }
+  } else {
+    if (solid(${x} + 1, ${y} - 1) || solid(${x} + 6, ${y} - 1)) { ${vy} = 0; break; }
+  }
+  ${y} += _s;
+  _k -= 1;
+}`;
+});
+def('p_jump', 'platform', 'stack', 'jump if %1 is on the ground, power %2', [SP, N(8)], (A, X) => {
+  const g = X.sv(A[0], 'gnd');
+  return `if (${g}) { ${X.sv(A[0], 'vy')} = 0 - ${A[1]}; ${g} = 0; sfx(7); }`;
+});
+def('p_onground', 'platform', 'bool', '%1 on ground?', [SP], (A, X) => X.sv(A[0], 'gnd'));
+def('p_fell', 'platform', 'bool', '%1 fell off the screen?', [SP], (A, X) => `(${X.sv(A[0], 'y')} > 124)`);
+
+// ---- Variables ----
+def('v_set', 'vars', 'stack', 'set %1 to %2', [VR, N(0)], (A, X) => `${X.gvar(A[0])} = ${A[1]};`);
+def('v_chg', 'vars', 'stack', 'change %1 by %2', [VR, N(1)], (A, X) => `${X.gvar(A[0])} += ${A[1]};`);
+def('v_get', 'vars', 'rep', '%1', [VR], (A, X) => X.gvar(A[0]));
+def('v_lset', 'vars', 'stack', 'set list item %1 to %2', [N(0), N(0)], (A, X) => { X.usesList = true; return `g_list[${A[0]}] = ${A[1]};`; });
+def('v_lchg', 'vars', 'stack', 'change list item %1 by %2', [N(0), N(1)], (A, X) => { X.usesList = true; return `g_list[${A[0]}] += ${A[1]};`; });
+def('v_lget', 'vars', 'rep', 'list item %1', [N(0)], (A, X) => { X.usesList = true; return `g_list[${A[0]}]`; });
+def('v_lfill', 'vars', 'stack', 'set all list items to %1', [N(0)], (A, X) => { X.usesList = true; return `memfill(g_list, ${X.listSize}, ${A[0]});`; });
+def('v_gset', 'vars', 'stack', 'set grid cell x %1 y %2 to %3', [N(0), N(0), N(1)], (A, X) => { X.usesGrid = true; return `mset(g_grid, 16, 12, ${A[0]}, ${A[1]}, ${A[2]});`; });
+def('v_gget', 'vars', 'rep', 'grid cell x %1 y %2', [N(0), N(0)], (A, X) => { X.usesGrid = true; return `mget(g_grid, 16, 12, ${A[0]}, ${A[1]})`; });
+def('v_gfill', 'vars', 'stack', 'set whole grid to %1', [N(0)], (A, X) => { X.usesGrid = true; return `memfill(g_grid, 192, ${A[0]});`; });
+def('v_gdraw', 'vars', 'stack', 'draw grid tiles in colour %1', [CL('WHITE')], (A, X) => { X.usesGrid = true; return `setpal(0, ${A[0]});\ndrawmap(g_grid, 16, 12, 0, 0);`; });
+def('r_tile', 'vars', 'rep', 'tile number of %1', [SP], (A, X) => `(${X.sc(A[0])} + 1)`);
+
+// ---- Game ----
+def('g_win', 'game', 'stack', 'win the game: %1', [TX('YOU WIN')], A => `sfx(2);\ngameover(${A[0]});`);
+def('g_lose', 'game', 'stack', 'lose the game: %1', [TX('GAME OVER')], A => `sfx(3);\ngameover(${A[0]});`);
+def('g_addscore', 'game', 'stack', 'add %1 to score', [N(1)], A => `addscore(${A[0]});`);
+def('g_setscore', 'game', 'stack', 'set score to %1', [N(0)], A => `score(${A[0]});`);
+def('g_score', 'game', 'rep', 'score', [], () => 'getscore()');
+def('g_loselife', 'game', 'stack', 'lose a life (game over at 0)', [], () =>
+  'v_lives -= 1;\nsfx(3);\nif (v_lives <= 0) { gameover("GAME OVER"); }');
+def('g_save', 'game', 'stack', 'save slot %1 = %2 (0-255)', [N(0), N(0)], A => `saveset(${A[0]}, ${A[1]});`);
+def('g_saved', 'game', 'rep', 'saved value in slot %1', [N(0)], A => `saveget(${A[0]})`);
+
+
+// ---------------------------------------------------------------------------
+// project helpers
+// ---------------------------------------------------------------------------
+const KEYWORDS = ['var', 'func', 'const', 'array', 'if', 'else', 'while', 'for', 'break', 'continue', 'return', 'init', 'frame'];
+const RESERVED = new Set([].concat(['bgc', 'rr', 'solid'], COLOR_NAMES, ['LEFT', 'RIGHT', 'UP', 'DOWN', 'A', 'B', 'SW', 'SH', 'TRUE', 'FALSE'], KEYWORDS, Object.keys(BUILTINS)));
+const ID_RE = /^[A-Za-z][A-Za-z0-9_]{0,15}$/;
+const SPR_RE = /^[A-Za-z][A-Za-z0-9]{0,11}$/;
+function spriteNameProblem(name, proj, selfIdx) {
+  if (!SPR_RE.test(name)) return 'sprite names are 1-12 letters/digits and start with a letter';
+  if (RESERVED.has(name)) return '"' + name + '" is a reserved word';
+  if (proj.sprites.some((s, i) => i !== selfIdx && s.name === name)) return 'another sprite is already called "' + name + '"';
+  return '';
+}
+function varNameProblem(name, proj) {
+  if (!ID_RE.test(name)) return 'names use letters, digits and _ (start with a letter, max 16)';
+  if (name === 'lives' || (proj.vars || []).includes(name)) return '"' + name + '" already exists';
+  return '';
+}
+function newBlock(t, proj) {
+  const d = DEFS[t];
+  const a = d.args.map(ad => {
+    if (ad.t === 'sprite') return proj && proj.sprites[0] ? proj.sprites[0].name : '';
+    if (ad.t === 'var') return (t === 'v_set' || t === 'v_chg' || t === 'v_get' || t === 'c_for') && proj && proj.vars && proj.vars[0] ? proj.vars[0] : 'lives';
+    if (ad.t === 'msg') return proj && proj.msgs && proj.msgs[0] ? proj.msgs[0] : '';
+    return ad.d === undefined ? '' : ad.d;
+  });
+  return { t, a, c: d.shape === 'c' ? [[]] : d.shape === 'c2' ? [[], []] : [] };
+}
+function walkBlocks(list, fn) {
+  for (const b of list) {
+    fn(b);
+    for (const v of b.a) if (v && typeof v === 'object') walkBlocks([v], fn);
+    for (const c of b.c) walkBlocks(c, fn);
+  }
+}
+function allBlocks(proj, fn) { for (const s of proj.scripts) walkBlocks(s.blocks, fn); }
+function cloneJSON(o) { return JSON.parse(JSON.stringify(o)); }
+const quote = s => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+
+function newProject() {
+  return {
+    format: 'arcadia-gamemaker', version: 1,
+    meta: {
+      name: 'MY GAME', id: 'mygame', blurb: 'Arcade: my first game', author: '', version: 1, color: 'ORANGE', twop: false, lower: false,
+      tiers: ['NORMAL', 'EASY', 'HARD', 'EXTREME'], help: ['D-pad: move', 'A: action', ''],
+      icon: ['........', '.######.', '#......#', '#.#..#.#', '#......#', '#.####.#', '.#....#.', '..####..']
+    },
+    settings: { autoClear: true, bg: 'BLACK', autoDraw: true, lives: 3, platColor: 'ORANGE', autoDrawPlatforms: true },
+    sprites: [{ name: 'hero', rows: ['..####..', '.######.', '##.##.##', '########', '########', '.##..##.', '.#....#.', '##....##'], color: 'YELLOW', x: 76, y: 60, stage: true, visible: true }],
+    vars: [], msgs: [], scripts: [],
+    tiles: new Array(16).fill('.'.repeat(20)),
+    bgTiles: new Array(16).fill('.'.repeat(20))
+  };
+}
+
+// ---------------------------------------------------------------------------
+// compiler
+// ---------------------------------------------------------------------------
+class Ctx {
+  constructor(proj) {
+    this.p = proj; this.errors = []; this.warns = [];
+    this.depth = 0; this.mode = 'frame'; this.script = null; this.cur = null;
+    this.use = {}; this.msgsUsed = new Set();
+    this.usesTiles = false; this.usesGrid = false; this.usesList = false; this.usesRR = false; this.usesTsize = false;
+    this.listSize = 128; this.stopCode = 'return 0;'; this.loopDepth = 0;
+    this.sprIdx = {};
+    proj.sprites.forEach((s, i) => { this.sprIdx[s.name] = i; });
+    this.autoClear = proj.settings.autoClear;
+    this.anyTsize2 = false;
+  }
+  err(msg) { this.errors.push((this.script ? '[' + this.script + '] ' : '') + (this.cur ? '"' + this.cur.label.replace(/%\d/g, '_') + '": ' : '') + msg); }
+  warn(msg) { this.warns.push((this.script ? '[' + this.script + '] ' : '') + msg); }
+  sc(name) {
+    if (!(name in this.sprIdx)) { this.err('unknown sprite "' + name + '"'); return '0'; }
+    return name;
+  }
+  sv(name, attr) {
+    this.sc(name);
+    const u = this.use[name];
+    if (u && u.has(attr)) return attr + '_' + name;
+    // not allocated: return default for reads; writes to unallocated attrs cannot happen (prescan)
+    const s = this.p.sprites[this.sprIdx[name]] || {};
+    if (attr === 'vis') return '1';
+    if (attr === 'col') return s.color || 'WHITE';
+    return '0';
+  }
+  touch(a, b) {
+    return `hit(${this.sv(a, 'x')} + 1, ${this.sv(a, 'y')} + 1, 6, 6, ${this.sv(b, 'x')} + 1, ${this.sv(b, 'y')} + 1, 6, 6)`;
+  }
+  edge(a) {
+    const x = this.sv(a, 'x'), y = this.sv(a, 'y');
+    return `(${x} <= 0 || ${x} >= 152 || ${y} <= 0 || ${y} >= 120)`;
+  }
+  gvar(name) {
+    if (name === 'lives') return 'v_lives';
+    if (!(this.p.vars || []).includes(name)) { this.err('unknown variable "' + name + '"'); return 'v_lives'; }
+    return 'v_' + name;
+  }
+  msgVar(name) {
+    if (!(this.p.msgs || []).includes(name)) { this.err('unknown message "' + name + '"'); return 'msg_x'; }
+    this.msgsUsed.add(name);
+    return 'msg_' + name;
+  }
+  tsz() { return this.anyTsize2 ? 2 : 1; }
+  textLen(a) { return (a && typeof a === 'object') ? 12 : String(a === undefined ? '' : a).length; }
+  // draw sprite at its own position (honours show/hide/colour/flip)
+  drawSprite(name) {
+    const x = this.sv(name, 'x'), y = this.sv(name, 'y'), c = this.sv(name, 'col'), f = this.sv(name, 'fl'), v = this.sv(name, 'vis');
+    const s = this.use[name] && this.use[name].has('fl')
+      ? `sprf(${x}, ${y}, ${this.sc(name)}, ${c}, ${f});` : `spr(${x}, ${y}, ${this.sc(name)}, ${c});`;
+    return v === '1' ? s : `if (${v}) { ${s} }`;
+  }
+  // HUD helper: when the screen is not auto-cleared, repaint the background behind the text/number first
+  hud(x, y, w, h, draw) {
+    if (this.autoClear) return draw(x, y);
+    const simple = s => /^\(?-?\d+\)?$/.test(s);
+    if (simple(x) && simple(y)) {
+      return `rect(${x}, ${y}, ${w}, ${h}, bgc);\n${draw(x, y)}`;
+    }
+    return `var _tx = ${x};\nvar _ty = ${y};\nrect(_tx, _ty, ${w}, ${h}, bgc);\n${draw('_tx', '_ty')}`;
+  }
+  body(b, i) { return this.stmts(b.c[i] || []); }
+  inLoop() { return this.depth > 0; }
+  stopStmt() { return this.stopCode; }
+  canEnd(list) {
+    let ok = false;
+    walkBlocks(list, b => {
+      if (['c_break', 'c_stop', 'g_win', 'g_lose', 'g_loselife'].includes(b.t)) ok = true;
+      if (this.mode === 'init' && ['c_waitf', 'c_waits', 'c_until'].includes(b.t)) ok = true;
+    });
+    return ok;
+  }
+  wait(kind, arg) {
+    if (this.mode !== 'init') {
+      this.err('"wait" blocks must sit directly in the script (not inside loops/if) - or inside a "when game starts" script');
+      return '';
+    }
+    if (kind === 'f') return `var _wn = ${arg};\nfor (var _wi = 0; _wi < _wn; _wi++) { wait(); }`;
+    return `while (!(${arg})) { wait(); }`;
+  }
+  argv(v, ad) {
+    if (v !== null && typeof v === 'object') return this.expr(v);
+    const t = ad.t;
+    if (t === 'num') {
+      let s = String(v === undefined || v === null ? '' : v).trim();
+      if (s === '') s = '0';
+      let n;
+      if (/^[+-]?\d+$/.test(s)) n = parseInt(s, 10);
+      else if (/^0[xX][0-9a-fA-F]+$/.test(s)) n = parseInt(s, 16);
+      else { this.err('"' + s + '" is not a whole number'); return '0'; }
+      if (n > 32767 || n < -32768) this.warn('number ' + n + ' does not fit in 16 bits and wraps around');
+      n = w16(n);
+      return n < 0 ? '(' + n + ')' : String(n);
+    }
+    if (t === 'bool') { const s = String(v === undefined || v === null ? '' : v).trim(); return s === '' || s === '0' ? '0' : '1'; }
+    if (t === 'color') {
+      const s = String(v === undefined ? '' : v).trim().toUpperCase();
+      if (COLOR_NAMES.includes(s)) return s;
+      if (/^\d+$/.test(s) && parseInt(s, 10) < 16) return s;
+      this.err('unknown colour "' + v + '"'); return 'WHITE';
+    }
+    if (t === 'sprite') { this.sc(v); return String(v); }
+    if (t === 'var' || t === 'msg') return String(v);
+    if (t === 'text') {
+      const s = String(v === undefined || v === null ? '' : v);
+      for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) > 255 || s.charCodeAt(i) < 32) { this.err('text may only use plain letters and symbols'); return '""'; }
+      if (s.length > 26) this.warn('text "' + s + '" is wider than the 160-pixel screen (26 characters at size 1)');
+      return quote(s);
+    }
+    if (t === 'opt') {
+      const s = String(v === undefined ? '' : v);
+      if (!ad.opts.some(o => o[1] === s)) { this.err('bad choice "' + s + '"'); return ad.opts[0][1]; }
+      return s;
+    }
+    this.err('internal: arg type ' + t); return '0';
+  }
+  expr(b) {
+    const d = DEFS[b.t];
+    if (!d) { this.err('unknown block ' + b.t); return '0'; }
+    if (d.shape !== 'rep' && d.shape !== 'bool') { this.err('"' + d.label + '" cannot be used inside another block'); return '0'; }
+    const prev = this.cur; this.cur = d;
+    const A = d.args.map((ad, i) => this.argv(b.a[i], ad));
+    const r = d.gen(A, this, b);
+    this.cur = prev;
+    return r;
+  }
+  stmt(b) {
+    const d = DEFS[b.t];
+    if (!d) { this.err('unknown block ' + b.t); return ''; }
+    if (d.shape === 'hat') { this.err('an event ("' + d.label + '") can only start a script'); return ''; }
+    if (d.shape === 'rep' || d.shape === 'bool') { this.err('a value block ("' + d.label.replace(/%\d/g, '_') + '") is lying loose in a script'); return ''; }
+    const prev = this.cur; this.cur = d;
+    const A = d.args.map((ad, i) => this.argv(b.a[i], ad));
+    const r = d.gen(A, this, b);
+    this.cur = prev;
+    return r;
+  }
+  stmts(list) {
+    const out = [];
+    for (const b of list) { const s = this.stmt(b); if (s) out.push(s); }
+    return out.join('\n');
+  }
+}
+
+// Compile a project to ARCL source.  Returns {src, errors[], warnings[], info}
+const BG_RECT_MAX = 100, BG_RECT_WARN = 70;
+function compileProject(proj) {
+  const X = new Ctx(proj);
+  const M = proj.meta, S = proj.settings;
+  const errors = X.errors, warns = X.warns;
+  // ---- validation of metadata
+  if (!M.name || !M.name.trim()) errors.push('Project: the game needs a name');
+  if (M.name && M.name.length > 15) errors.push('Project: name is longer than 15 characters');
+  if (M.blurb && M.blurb.length > 23) errors.push('Project: blurb is longer than 23 characters');
+  if (M.author && M.author.length > 15) errors.push('Project: author is longer than 15 characters');
+  if ((M.tiers || []).some(t => t.length > 7)) errors.push('Project: difficulty names are limited to 7 characters');
+  if ((M.help || []).some(t => t.length > 23)) errors.push('Project: help lines are limited to 23 characters');
+  if (proj.sprites.length > R.SPR_MAX) errors.push('Too many sprites (max ' + R.SPR_MAX + ')');
+  proj.sprites.forEach((s, i) => { const pr = spriteNameProblem(s.name, proj, i); if (pr) errors.push('Sprite #' + (i + 1) + ': ' + pr); });
+  // ---- attribute prescan
+  const need = {};
+  const ensure = n => (need[n] = need[n] || new Set(['x', 'y']));
+  proj.sprites.forEach(s => { if (s.stage && S.autoDraw) ensure(s.name); });
+  allBlocks(proj, b => {
+    const d = DEFS[b.t]; if (!d) return;
+    d.args.forEach((ad, i) => {
+      if (ad.t !== 'sprite' || typeof b.a[i] === 'object') return;
+      const n = b.a[i];
+      if (!(n in X.sprIdx)) return;
+      if (b.t === 'l_draw' || b.t === 'r_tile') return;
+      const set = ensure(n);
+      if (b.t === 'l_show' || b.t === 'l_hide') set.add('vis');
+      if (b.t === 'l_setcol') set.add('col');
+      if (b.t === 'l_flip') set.add('fl');
+      if (['m_setvel', 'm_vel', 'm_bounce', 'r_vx', 'r_vy'].includes(b.t)) { set.add('vx'); set.add('vy'); }
+      if (b.t.startsWith('p_')) { set.add('vx'); set.add('vy'); set.add('gnd'); }
+    });
+    if (b.t === 'l_size' && b.a[0] === '2') X.anyTsize2 = true;
+  });
+  X.use = need;
+  // ---- scripts
+  const funcs = [];            // source text of each script function
+  const calls = { event: [], frame: [], start: [] };
+  const extraGlobals = [];
+  const scripts = proj.scripts.map((s, i) => ({ s, i })).sort((a, b) => (a.s.y - b.s.y) || (a.s.x - b.s.x) || (a.i - b.i));
+  let nScripts = 0;
+  for (const { s, i } of scripts) {
+    if (!s.blocks.length) continue;
+    const hat = s.blocks[0];
+    const hd = DEFS[hat.t];
+    if (!hd || hd.shape !== 'hat') {
+      X.script = null;
+      warns.push('A loose stack starting with "' + (hd ? hd.label.replace(/%\d/g, '_') : hat.t) + '" has no event block on top, so it never runs.');
+      continue;
+    }
+    const name = hd.label.replace(/%(\d)/g, (m, k) => String(hat.a[k - 1] === undefined ? '_' : hat.a[k - 1]));
+    X.script = name;
+    const kind = hd.hatKind;
+    X.mode = kind === 'start' ? 'init' : 'frame';
+    X.depth = 0;
+    const rest = s.blocks.slice(1);
+    const fname = 'sc_' + (++nScripts);
+    const isWait = b => b.t === 'c_waitf' || b.t === 'c_waits' || b.t === 'c_until';
+    const topWait = kind !== 'start' && rest.some(isWait);
+    // condition of the hat
+    let cond = '1';
+    if (kind === 'event') {
+      X.cur = hd;
+      const A = hd.args.map((ad, k) => X.argv(hat.a[k], ad));
+      cond = hd.gen(A, X, hat);
+      X.cur = null;
+    }
+    if (kind === 'start' || !topWait) {
+      X.stopCode = 'return 0;';
+      const body = X.stmts(rest);
+      funcs.push(`func ${fname}() {\n${ind(body)}${body ? '\n' : ''}}`);
+      if (kind === 'start') calls.start.push(`${fname}();`);
+      else if (kind === 'frame') calls.frame.push(`${fname}();`);
+      else calls.event.push(`if (${cond}) { ${fname}(); }`);
+    } else {
+      // state machine: split at the top-level waits
+      const segs = [[]]; const waits = [];
+      for (const b of rest) { if (isWait(b)) { waits.push(b); segs.push([]); } else segs[segs.length - 1].push(b); }
+      const st = 'st_' + nScripts, tm = 'tm_' + nScripts;
+      extraGlobals.push(`${st} = 0`);
+      if (waits.some(w => w.t !== 'c_until')) extraGlobals.push(`${tm} = 0`);
+      X.stopCode = `${st} = 0;\nreturn 0;`;
+      const lines = [];
+      const waitSetup = (w) => {
+        X.cur = DEFS[w.t];
+        if (w.t === 'c_until') { return ''; }
+        const n = w.t === 'c_waits' ? `(${X.argv(w.a[0], DEFS[w.t].args[0])}) * 30` : X.argv(w.a[0], DEFS[w.t].args[0]);
+        X.cur = null;
+        return `${tm} = ${n};\n`;
+      };
+      for (let k = 0; k < segs.length; k++) {
+        const body = X.stmts(segs[k]);
+        let blk = '';
+        if (k === 0) blk += `if (!${cond.startsWith('(') || /^[A-Za-z_]+\(.*\)$/.test(cond) ? cond : '(' + cond + ')'}) { return 0; }\n`;
+        blk += body ? body + '\n' : '';
+        if (k < waits.length) blk += waitSetup(waits[k]) + `${st} = ${2 * k + 1};\nreturn 0;`;
+        else blk += `${st} = 0;`;
+        lines.push(`if (${st} == ${2 * k}) {\n${ind(blk.replace(/\n$/, ''))}\n}`);
+        if (k < waits.length) {
+          const w = waits[k];
+          X.cur = DEFS[w.t];
+          let chk;
+          if (w.t === 'c_until') chk = `if (!(${X.argv(w.a[0], DEFS[w.t].args[0])})) { return 0; }`;
+          else chk = `${tm} -= 1;\nif (${tm} > 0) { return 0; }`;
+          X.cur = null;
+          lines.push(`if (${st} == ${2 * k + 1}) {\n${ind(chk)}\n  ${st} = ${2 * k + 2};\n}`);
+        }
+      }
+      funcs.push(`func ${fname}() {\n${ind(lines.join('\n'))}\n}`);
+      // the SM function evaluates its own trigger; calling it each frame
+      (kind === 'frame' ? calls.frame : calls.event).push(`${fname}();`);
+    }
+  }
+  X.script = null; X.cur = null;
+  // ---- sprites / globals
+  const dirs = [];
+  const q = quote;
+  const safe = s => String(s || '').replace(/[^\x20-\xFF]/g, '?');
+  dirs.push(`@name ${q(safe(M.name))}`);
+  dirs.push(`@blurb ${q(safe(M.blurb))}`);
+  dirs.push(`@author ${q(safe(M.author))}`);
+  dirs.push(`@version ${(M.version | 0) & 255}`);
+  dirs.push(`@color ${COLOR_NAMES.includes(M.color) ? M.color : 'ORANGE'}`);
+  if (M.twop) dirs.push('@twoplayer');
+  if (M.lower) dirs.push('@lower');
+  dirs.push('@tiers ' + (M.tiers || []).slice(0, 4).map(t => q(safe(t))).join(' '));
+  const help = (M.help || []).filter(h => h && h.trim()).slice(0, 3);
+  if (help.length) dirs.push('@help ' + help.map(h => q(safe(h))).join(' '));
+  const rowsOf = rows => rows.map((r, i) => (i ? '      ' : '') + '"' + r.replace(/[^#]/g, '.') + '"').join('\n');
+  const icon = (M.icon && M.icon.length === 8) ? M.icon : newProject().meta.icon;
+  dirs.push('@icon ' + rowsOf(icon));
+  proj.sprites.forEach(s => {
+    const rows = (s.rows || []).slice(0, 8);
+    while (rows.length < 8) rows.push('........');
+    dirs.push(`@sprite ${s.name} ` + rows.map((r, i) => (i ? '            ' : '') + '"' + (r + '........').slice(0, 8).replace(/[^#]/g, '.') + '"').join('\n'));
+  });
+  const gl = [];
+  gl.push(`bgc = ${COLOR_NAMES.includes(S.bg) ? S.bg : 'BLACK'}`);
+  gl.push(`v_lives = ${Math.max(0, Math.min(99, S.lives | 0))}`);
+  for (const v of (proj.vars || [])) gl.push('v_' + v + ' = 0');
+  for (const m of (proj.msgs || [])) if (X.msgsUsed.has(m)) gl.push('msg_' + m + ' = 0');
+  for (const [n, set] of Object.entries(need)) {
+    const sp = proj.sprites[X.sprIdx[n]];
+    if (!sp) continue;
+    gl.push(`x_${n} = ${sp.x | 0}`, `y_${n} = ${sp.y | 0}`);
+    if (set.has('vx')) gl.push(`vx_${n} = 0`, `vy_${n} = 0`);
+    if (set.has('vis')) gl.push(`vis_${n} = ${sp.visible === false ? 0 : 1}`);
+    if (set.has('col')) gl.push(`col_${n} = ${COLOR_NAMES.includes(sp.color) ? sp.color : 'WHITE'}`);
+    if (set.has('fl')) gl.push(`fl_${n} = 0`);
+    if (set.has('gnd')) gl.push(`gnd_${n} = 0`);
+  }
+  for (const g of extraGlobals) gl.push(g);
+  // ---- frame()
+  const tiles = (proj.tiles && proj.tiles.length === 16) ? proj.tiles.map(r => (r + '.'.repeat(20)).slice(0, 20)) : [];
+  const hasTiles = tiles.some(r => r.includes('#'));
+  if (hasTiles) X.usesTiles = true;
+  const fr = [];
+  if (S.autoClear) fr.push('cls(bgc);');
+  // background tiles: colour-index grid (hex digit = COLOR_NAMES index, '.' = none), merged into rects
+  {
+    const bt = (proj.bgTiles && proj.bgTiles.length === 16) ? proj.bgTiles.map(r => (String(r) + '.'.repeat(20)).slice(0, 20).split('')) : null;
+    if (bt && bt.some(r => r.some(c => c !== '.' && parseInt(c, 16) < COLOR_NAMES.length))) {
+      const nb = fr.length;
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 20; x++) {
+        const c = bt[y][x]; if (c === '.' || !(parseInt(c, 16) < COLOR_NAMES.length)) continue;
+        let w = 1; while (x + w < 20 && bt[y][x + w] === c) w++;
+        let hh = 1; while (y + hh < 16 && bt[y + hh].slice(x, x + w).every(q => q === c)) hh++;
+        for (let yy = 0; yy < hh; yy++) for (let xx = 0; xx < w; xx++) bt[y + yy][x + xx] = '.';
+        fr.push(`rect(${x * 8}, ${y * 8}, ${w * 8}, ${hh * 8}, ${COLOR_NAMES[parseInt(c, 16)]});`);
+      }
+      const nr = fr.length - nb;
+      X.bgRects = nr;
+      if (nr > BG_RECT_MAX) errors.push('Background painting needs ' + nr + ' rectangles (max ' + BG_RECT_MAX + '). Use bigger blocks of one colour or paint fewer different tiles.');
+      else if (nr > BG_RECT_WARN) warns.push('Background painting uses ' + nr + ' of ' + BG_RECT_MAX + ' rectangles; every one costs speed each frame.');
+    }
+  }
+  if (hasTiles && S.autoDrawPlatforms !== false) {
+    const g2 = tiles.map(r => r.split(''));
+    const pc = COLOR_NAMES.includes(S.platColor) ? S.platColor : 'BROWN';
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 20; x++) {
+      if (g2[y][x] !== '#') continue;
+      let w = 1; while (x + w < 20 && g2[y][x + w] === '#') w++;
+      let hh = 1; while (y + hh < 16 && g2[y + hh].slice(x, x + w).every(c => c === '#')) hh++;
+      for (let yy = 0; yy < hh; yy++) for (let xx = 0; xx < w; xx++) g2[y + yy][x + xx] = '.';
+      fr.push(`rect(${x * 8}, ${y * 8}, ${w * 8}, ${hh * 8}, ${pc});`);
+    }
+  }
+  if (X.usesTsize) fr.push('tsize(1);');
+  for (const c of calls.event) fr.push(c);
+  for (const c of calls.frame) fr.push(c);
+  if (S.autoDraw) {
+    for (const sp of proj.sprites) if (sp.stage && need[sp.name]) fr.push(X.drawSprite(sp.name));
+  }
+  for (const m of (proj.msgs || [])) if (X.msgsUsed.has(m)) fr.push(`if (msg_${m} > 0) { msg_${m} -= 1; }`);
+  const out = ['// Generated by Arcadia Game Maker - edit the blocks, not this file.'];
+  out.push(dirs.join('\n'));
+  out.push('');
+  out.push('var ' + gl.map(g => g).join(',\n    ') + ';');
+  if (X.usesTiles) out.push('array g_tiles[320] = {' + tiles.concat(tiles.length ? [] : new Array(16).fill('.'.repeat(20))).join('').split('').map(c => c === '#' ? 1 : 0).join(',') + '};   // platform tiles, 20 x 16');
+  if (X.usesGrid) out.push('array g_grid[192];   // 16 x 12 cells');
+  if (X.usesList) out.push(`array g_list[${X.listSize}];`);
+  out.push('');
+  if (X.usesTiles) out.push('func solid(px, py) {\n  return mget(g_tiles, 20, 16, px >> 3, py >> 3) > 0;\n}\n');
+  if (X.usesRR) out.push('func rr(lo, hi) {\n  return lo + rnd(hi - lo + 1);\n}\n');
+  for (const f of funcs) out.push(f + '\n');
+  out.push('func init() {\n' + ind(calls.start.join('\n')) + (calls.start.length ? '\n' : '') + '}\n');
+  out.push('func frame() {\n' + ind(fr.join('\n')) + (fr.length ? '\n' : '') + '}\n');
+  let src = out.join('\n');
+  return { src, errors, warnings: warns, X };
+}
+
+// Full pipeline: project -> source -> blob
+function buildProject(proj) {
+  const r = compileProject(proj);
+  const res = { src: r.src, errors: r.errors.slice(), guardErrors: [], warnings: r.warnings.slice(), blob: null, meta: null, g: null };
+  const [ce, cw] = collisionCheck(proj.meta.name, proj.meta.blurb);
+  const [ie, iw] = idCheck(proj.meta.id, proj.meta.name);
+  res.guardErrors.push(...ce, ...ie); res.warnings.push(...cw, ...iw);
+  if (r.errors.length) return res;
+  try {
+    const c = compileSource(r.src);
+    res.blob = c.blob; res.meta = c.meta; res.g = c.g;
+  } catch (e) {
+    if (e instanceof CompileError) {
+      res.errors.push('Assembler: ' + e.message + (/line (\d+)/.test(e.message) ? ' (see the generated code)' : ''));
+    } else throw e;
+  }
+  if (res.blob) {
+    res.stats = { bytes: res.blob.length, code: res.g.code.length, strs: res.g.strs.length, mem: res.g.memWords, globals: res.g.globals.size, sprites: proj.sprites.length };
+    if (res.g.globals.size > 100) res.warnings.push('Using ' + res.g.globals.size + ' of 128 global variables');
+    if (res.g.code.length > 6000) res.warnings.push('Code is ' + res.g.code.length + ' of 8192 bytes');
+  }
+  return res;
+}
+
+// ===== Template projects =====
+function blockHeight(b) {
+  let h = 30;
+  const d = DEFS[b.t];
+  if (d && (d.shape === 'c' || d.shape === 'c2')) {
+    h += 14;
+    for (const c of b.c) { h += 10; for (const x of c) h += blockHeight(x); }
+    if (d.shape === 'c2') h += 22;
+  }
+  return h;
+}
+// place scripts in one column in run order: start scripts, then event scripts, then "every frame" scripts (top to bottom)
+function autoLayout(proj, heights) {
+  const rank = s => { const hat = s.blocks[0] && DEFS[s.blocks[0].t]; if (!hat || hat.shape !== 'hat') return 3; return hat.hatKind === 'start' ? 0 : hat.hatKind === 'event' ? 1 : 2; };
+  const idx = proj.scripts.map((s, i) => i).sort((a, b) => (rank(proj.scripts[a]) - rank(proj.scripts[b])) || (proj.scripts[a].y - proj.scripts[b].y) || (proj.scripts[a].x - proj.scripts[b].x) || (a - b));
+  let y = 16;
+  for (const i of idx) {
+    const s = proj.scripts[i];
+    const h = (heights && heights[i]) || (16 + s.blocks.reduce((a, b) => a + blockHeight(b), 0));
+    s.x = 16; s.y = y; y += h + 26;
+  }
+  return proj;
+}
+const T = {
+  k: (t, ...a) => ({ t, a, c: [] }),
+  C: (t, a, ...slots) => ({ t, a, c: slots.length ? slots : [[]] }),
+  rnd: (a, b) => T.k('q_rnd', a, b),
+  add: (a, b) => T.k('o_math', a, '+', b),
+  sub: (a, b) => T.k('o_math', a, '-', b),
+  div: (a, b) => T.k('o_math', a, '/', b),
+  cmp: (a, op, b) => T.k('o_cmp', a, op, b),
+  and: (a, b) => T.k('o_and', a, b),
+  V: n => T.k('v_get', n),
+  score: () => T.k('g_score'),
+  sp: rows => rows.map(r => r.replace(/[^#]/g, '.'))
+};
+const ART = {
+  ship: ['...##...', '...##...', '..####..', '..####..', '.######.', '########', '##.##.##', '#..##..#'],
+  shot: ['...##...', '...##...', '...##...', '...##...', '........', '........', '........', '........'],
+  foe: ['..####..', '.######.', '##.##.##', '########', '########', '.#.##.#.', '#......#', '........'],
+  hero: ['..####..', '.######.', '.#.##.#.', '.######.', '..####..', '.######.', '.#....#.', '##....##'],
+  coin: ['..####..', '.#....#.', '#..##..#', '#.#..#.#', '#.#..#.#', '#..##..#', '.#....#.', '..####..'],
+  flag: ['.######.', '.#####..', '.####...', '.#......', '.#......', '.#......', '.#......', '###.....'],
+  spike: ['........', '........', '...#....', '..###...', '.#####..', '.#####..', '#######.', '########'],
+  rock: ['..###...', '.#####..', '#######.', '#######.', '#######.', '.#####..', '..###...', '........'],
+  kid: ['..####..', '.######.', '.#.##.#.', '.######.', '..####..', '..#..#..', '..#..#..', '.##..##.'],
+  bug: ['#......#', '.#.##.#.', '..####..', '.######.', '########', '.######.', '.#.##.#.', '#......#']
+};
+function spriteDef(name, art, color, x, y, extra) {
+  return Object.assign({ name, rows: T.sp(ART[art]), color, x, y, stage: true, visible: true }, extra || {});
+}
+function baseProject(meta, settings) {
+  const p = newProject();
+  Object.assign(p.meta, meta);
+  Object.assign(p.settings, settings || {});
+  p.sprites = []; p.vars = []; p.msgs = []; p.scripts = [];
+  return p;
+}
+const S = (blocks) => ({ x: 0, y: 0, blocks });
+
+function tplShooter() {
+  const { k, C, rnd, add, div, cmp, V, score } = T;
+  const p = baseProject({
+    name: 'COMET GUARD', id: 'cometguard', blurb: 'Arcade: stop the comets', author: 'Game Maker', color: 'CYAN',
+    help: ['Left/Right: move ship', 'A: fire', 'Stop 3 comets landing'], icon: T.sp(ART.ship)
+  }, { bg: 'NAVY', lives: 3 });
+  p.sprites.push(spriteDef('ship', 'ship', 'CYAN', 76, 112), spriteDef('shot', 'shot', 'YELLOW', 0, -20, { visible: false }),
+    spriteDef('foe1', 'foe', 'ORANGE', 20, -8), spriteDef('foe2', 'foe', 'LIME', 80, -48), spriteDef('foe3', 'foe', 'PINK', 130, -88));
+  p.vars = ['shotlive'];
+  const respawn = n => [k('m_goto', 'foe' + n, rnd(0, 152), -8), k('m_setvel', 'foe' + n, 0, add(1, div(score(), 60)))];
+  p.scripts.push(
+    S([k('h_start'), k('l_hide', 'shot'), k('v_set', 'shotlive', 0),
+      k('m_setvel', 'foe1', 0, 1), k('m_setvel', 'foe2', 0, 1), k('m_setvel', 'foe3', 0, 1)]),
+    S([k('h_frame'), k('m_dpad', 'ship', 'h', 3), k('m_keep', 'ship')]),
+    S([k('h_frame'), C('c_if', [cmp(V('shotlive'), '==', 1)], [k('m_vel', 'shot'),
+      C('c_if', [cmp(k('r_y', 'shot'), '<', 0)], [k('l_hide', 'shot'), k('v_set', 'shotlive', 0)])])]),
+    ...[1, 2, 3].map(n => S([k('h_frame'), k('m_vel', 'foe' + n),
+      C('c_if', [cmp(k('r_y', 'foe' + n), '>', 120)], [...respawn(n), k('l_shake', 200, 2), k('g_loselife')])])),
+    S([k('h_frame'), C('c_if', [cmp(score(), '>=', 200)], [k('g_win', 'YOU WIN')])]),
+    S([k('h_frame'), k('l_num', score(), 4, 4, 'WHITE', 0), k('l_text', 'LIVES', 104, 4, 'GRAY'), k('l_num', V('lives'), 142, 4, 'RED', 0)]),
+    S([k('h_btnp', 'A'), C('c_if', [cmp(V('shotlive'), '==', 0)], [
+      k('m_goto', 'shot', k('r_x', 'ship'), k('o_math', k('r_y', 'ship'), '-', 6)), k('m_setvel', 'shot', 0, -4),
+      k('l_show', 'shot'), k('v_set', 'shotlive', 1), k('s_sfx', 5)])]),
+    ...[1, 2, 3].map(n => S([k('h_touch', 'shot', 'foe' + n), C('c_if', [cmp(V('shotlive'), '==', 1)], [
+      k('g_addscore', 10), k('l_burst', k('r_x', 'foe' + n), k('r_y', 'foe' + n), 12, 'YELLOW'), k('s_sfx', 4),
+      ...respawn(n), k('l_hide', 'shot'), k('v_set', 'shotlive', 0), k('m_goto', 'shot', 0, -20)])])),
+    ...[1, 2, 3].map(n => S([k('h_touch', 'ship', 'foe' + n), k('l_shake', 250, 3), ...respawn(n), k('g_loselife')]))
+  );
+  return autoLayout(p);
+}
+
+function tplPlatformer() {
+  const { k, C, V, score } = T;
+  const p = baseProject({
+    name: 'HILL HOP', id: 'hillhop', blurb: 'Arcade: climb & collect', author: 'Game Maker', color: 'GREEN',
+    help: ['Left/Right: run', 'Z: jump', 'Get coins, reach flag'], icon: T.sp(ART.coin)
+  }, { bg: 'NAVY', lives: 3, platColor: 'ORANGE' });
+  p.sprites.push(spriteDef('hero', 'hero', 'YELLOW', 8, 104),
+    spriteDef('coin1', 'coin', 'YELLOW', 40, 76), spriteDef('coin2', 'coin', 'YELLOW', 96, 52), spriteDef('coin3', 'coin', 'YELLOW', 24, 28),
+    spriteDef('flag', 'flag', 'LIME', 144, 32));
+  // 20 x 16 tile layer (8 pixels per tile): floor with a pit, three stepping platforms and a goal ledge
+  const rows = new Array(16).fill('.'.repeat(20));
+  const fill = (x, y, w, h) => { for (let r = y; r < y + h; r++) rows[r] = rows[r].slice(0, x) + '#'.repeat(w) + rows[r].slice(x + w); };
+  fill(0, 14, 9, 2); fill(12, 14, 8, 2);
+  fill(3, 11, 5, 1); fill(10, 8, 5, 1); fill(2, 5, 5, 1); fill(15, 5, 5, 1);
+  p.tiles = rows;
+  const restart = [k('m_goto', 'hero', 8, 104), k('m_setvel', 'hero', 0, 0)];
+  p.scripts.push(
+    S([k('h_frame'), k('p_move', 'hero', 2), k('p_gravity', 'hero'),
+      C('c_if', [k('p_fell', 'hero')], [k('l_shake', 250, 3), ...restart, k('g_loselife')])]),
+    S([k('h_frame'), k('l_text', 'SCORE', 4, 4, 'WHITE'), k('l_num', score(), 40, 4, 'WHITE', 0), k('l_text', 'LIVES', 104, 4, 'GRAY'), k('l_num', V('lives'), 142, 4, 'RED', 0)]),
+    S([k('h_btnp', 'A'), k('p_jump', 'hero', 9)]),
+    ...[1, 2, 3].map(n => S([k('h_touch', 'hero', 'coin' + n), k('g_addscore', 10), k('s_sfx', 4),
+      k('l_burst', k('r_x', 'coin' + n), k('r_y', 'coin' + n), 10, 'YELLOW'), k('m_goto', 'coin' + n, 0, -30)])),
+    S([k('h_touch', 'hero', 'flag'), k('g_win', 'YOU MADE IT')])
+  );
+  return autoLayout(p);
+}
+
+function tplSnake() {
+  const { k, C, rnd, add, cmp, and, V } = T;
+  const p = baseProject({
+    name: 'WORM TRAIL', id: 'wormtrail', blurb: 'Arcade: eat and grow', author: 'Game Maker', color: 'LIME',
+    help: ['D-pad: steer the worm', 'Eat the red dots', 'Do not hit walls/self'], icon: T.sp(ART.bug)
+  }, { bg: 'BLACK', lives: 1 });
+  p.sprites.push(spriteDef('dot', 'coin', 'RED', 0, 0, { stage: false }));
+  p.vars = ['hx', 'hy', 'dx', 'dy', 'len', 'tick', 'speed', 'fx', 'fy', 'grow', 'gx', 'gy', 'turned'];
+  const set = (v, x) => k('v_set', v, x), chg = (v, x) => k('v_chg', v, x);
+  const cell = (x, y) => k('v_gget', x, y);
+  const steer = (btn, dx, dy, test) => S([k('h_btn', btn), C('c_if', [cmp(V(test), '==', 0)], [set('dx', dx), set('dy', dy), set('turned', 1)])]);
+  const newFood = [set('fx', rnd(0, 15)), set('fy', rnd(0, 11)),
+    C('c_runtil', [cmp(cell(V('fx'), V('fy')), '==', 0)], [set('fx', rnd(0, 15)), set('fy', rnd(0, 11))])];
+  p.scripts.push(
+    S([k('h_start'), k('v_gfill', 0), set('len', 3), set('hx', 8), set('hy', 6), set('dx', 1), set('dy', 0), set('tick', 0), set('grow', 0), set('turned', 0),
+      set('speed', 6),
+      C('c_if', [cmp(k('q_tier'), '==', 1)], [set('speed', 8)]),
+      C('c_if', [cmp(k('q_tier'), '==', 2)], [set('speed', 4)]),
+      C('c_if', [cmp(k('q_tier'), '==', 3)], [set('speed', 3)]),
+      k('v_gset', 6, 6, 1), k('v_gset', 7, 6, 2), k('v_gset', 8, 6, 3), ...newFood]),
+    S([k('h_frame'), chg('tick', 1),
+      C('c_if', [cmp(V('tick'), '>=', V('speed'))], [
+        set('tick', 0), set('turned', 0), chg('hx', V('dx')), chg('hy', V('dy')),
+        C('c_if', [k('o_or', k('o_or', cmp(V('hx'), '<', 0), cmp(V('hx'), '>', 15)), k('o_or', cmp(V('hy'), '<', 0), cmp(V('hy'), '>', 11)))],
+          [k('g_lose', 'CRASHED')]),
+        C('c_ifelse', [cmp(V('grow'), '==', 0)],
+          [C('c_for', ['gx', 0, 15], [C('c_for', ['gy', 0, 11], [
+            C('c_if', [cmp(cell(V('gx'), V('gy')), '>', 0)], [k('v_gset', V('gx'), V('gy'), k('o_math', cell(V('gx'), V('gy')), '-', 1))])])])],
+          [set('grow', 0)]),
+        C('c_if', [cmp(cell(V('hx'), V('hy')), '>', 0)], [k('g_lose', 'CRASHED')]),
+        k('v_gset', V('hx'), V('hy'), V('len')),
+        C('c_if', [and(cmp(V('hx'), '==', V('fx')), cmp(V('hy'), '==', V('fy')))], [
+          k('g_addscore', 10), chg('len', 1), set('grow', 1), k('s_sfx', 4),
+          C('c_if', [cmp(V('len'), '>=', 40)], [k('g_win', 'YOU WIN')]), ...newFood])])]),
+    S([k('h_frame'),
+      C('c_for', ['gx', 0, 15], [C('c_for', ['gy', 0, 11], [
+        C('c_if', [cmp(cell(V('gx'), V('gy')), '>', 0)], [
+          k('l_rect', k('o_math', V('gx'), '*', 10), k('o_math', V('gy'), '*', 10), 9, 9, 'GREEN')])])]),
+      k('l_rect', k('o_math', V('hx'), '*', 10), k('o_math', V('hy'), '*', 10), 9, 9, 'LIME'),
+      k('l_circ', 'disc', add(k('o_math', V('fx'), '*', 10), 4), add(k('o_math', V('fy'), '*', 10), 4), 3, 'RED'),
+      k('l_text', 'SCORE', 2, 121, 'GRAY'), k('l_num', k('g_score'), 40, 121, 'WHITE', 0)]),
+    steer('LEFT', -1, 0, 'dx'), steer('RIGHT', 1, 0, 'dx'), steer('UP', 0, -1, 'dy'), steer('DOWN', 0, 1, 'dy')
+  );
+  // steering must not reverse: LEFT/RIGHT allowed when dx==0 (moving vertically), UP/DOWN when dy==0
+  const free = c => and(c, cmp(V('turned'), '==', 0));
+  p.scripts[3].blocks[1].a[0] = free(cmp(V('dx'), '!=', 1));
+  p.scripts[4].blocks[1].a[0] = free(cmp(V('dx'), '!=', -1));
+  p.scripts[5].blocks[1].a[0] = free(cmp(V('dy'), '!=', 1));
+  p.scripts[6].blocks[1].a[0] = free(cmp(V('dy'), '!=', -1));
+  return autoLayout(p);
+}
+
+function tplDodger() {
+  const { k, C, rnd, add, div, cmp, V, score } = T;
+  const p = baseProject({
+    name: 'ROCK RAIN', id: 'rockrain', blurb: 'Reflex: avoid the rocks', author: 'Game Maker', color: 'ORANGE',
+    help: ['Left/Right: run', 'Avoid falling rocks', 'Survive to win'], icon: T.sp(ART.rock)
+  }, { bg: 'NAVY', lives: 3 });
+  p.sprites.push(spriteDef('kid', 'kid', 'YELLOW', 76, 112),
+    spriteDef('rock1', 'rock', 'GRAY', 20, -8), spriteDef('rock2', 'rock', 'ORANGE', 80, -50), spriteDef('rock3', 'rock', 'PINK', 130, -90));
+  p.vars = ['base'];
+  const respawn = n => [k('m_goto', 'rock' + n, rnd(0, 152), -8),
+    k('m_setvel', 'rock' + n, 0, add(add(V('base'), rnd(0, 1)), div(score(), 25)))];
+  p.scripts.push(
+    S([k('h_start'), k('v_set', 'base', add(1, div(k('q_tier'), 2))),
+      k('m_setvel', 'rock1', 0, 1), k('m_setvel', 'rock2', 0, 1), k('m_setvel', 'rock3', 0, 2)]),
+    S([k('h_frame'), k('m_dpad', 'kid', 'h', 3), k('m_keep', 'kid')]),
+    ...[1, 2, 3].map(n => S([k('h_frame'), k('m_vel', 'rock' + n),
+      C('c_if', [cmp(k('r_y', 'rock' + n), '>', 120)], [k('g_addscore', 1), ...respawn(n)])])),
+    S([k('h_frame'), C('c_if', [cmp(score(), '>=', 60)], [k('g_win', 'YOU SURVIVED')])]),
+    S([k('h_frame'), k('l_num', score(), 4, 4, 'WHITE', 0), k('l_text', 'LIVES', 104, 4, 'GRAY'), k('l_num', V('lives'), 142, 4, 'RED', 0)]),
+    ...[1, 2, 3].map(n => S([k('h_touch', 'kid', 'rock' + n), k('l_shake', 250, 3), k('l_burst', k('r_x', 'kid'), k('r_y', 'kid'), 14, 'ORANGE'),
+      ...respawn(n), k('g_loselife')]))
+  );
+  return autoLayout(p);
+}
+
+function tplCoins() {
+  const { k, C, rnd, add, cmp, V } = T;
+  const p = baseProject({
+    name: 'COIN CHASE', id: 'coinchase', blurb: 'Reflex: grab the coins', author: 'Game Maker', color: 'YELLOW',
+    help: ['D-pad: run around', 'Grab coins for time', 'Avoid the bug'], icon: T.sp(ART.coin)
+  }, { bg: 'DKGRAY', lives: 3 });
+  p.sprites.push(spriteDef('hero', 'hero', 'CYAN', 76, 60), spriteDef('coin', 'coin', 'YELLOW', 120, 90), spriteDef('bug', 'bug', 'RED', 10, 100));
+  p.vars = ['time', 'tick'];
+  p.scripts.push(
+    S([k('h_start'), k('v_set', 'time', 30), k('v_set', 'tick', 0)]),
+    S([k('h_frame'), k('m_dpad', 'hero', 'hv', 2), k('m_keep', 'hero'), k('m_toward', 'bug', 'hero', 1)]),
+    S([k('h_frame'), k('v_chg', 'tick', 1), C('c_if', [cmp(V('tick'), '>=', 30)], [
+      k('v_set', 'tick', 0), k('v_chg', 'time', -1), C('c_if', [cmp(V('time'), '<=', 0)], [k('g_lose', 'TIME UP')])])]),
+    S([k('h_frame'), k('l_text', 'SCORE', 4, 4, 'WHITE'), k('l_num', k('g_score'), 40, 4, 'YELLOW', 0),
+      k('l_text', 'TIME', 90, 4, 'WHITE'), k('l_num', V('time'), 120, 4, 'CYAN', 0), k('l_text', 'LIVES', 4, 118, 'GRAY'), k('l_num', V('lives'), 40, 118, 'RED', 0)]),
+    S([k('h_touch', 'hero', 'coin'), k('g_addscore', 1), k('v_chg', 'time', 2), k('s_sfx', 4),
+      k('l_burst', k('r_x', 'coin'), k('r_y', 'coin'), 10, 'YELLOW'), k('m_goto', 'coin', rnd(4, 148), rnd(18, 108))]),
+    S([k('h_touch', 'hero', 'bug'), k('l_shake', 250, 3), k('m_goto', 'bug', 4, 100), k('m_goto', 'hero', 76, 60), k('g_loselife')])
+  );
+  return autoLayout(p);
+}
+
+function tplBlank() {
+  const { k } = T;
+  const p = newProject();
+  p.scripts.push(S([k('h_frame'), k('m_dpad', 'hero', 'hv', 2), k('m_keep', 'hero')]),
+    S([k('h_btnp', 'A'), k('s_sfx', 0), k('g_addscore', 1)]),
+    S([k('h_frame'), k('l_num', k('g_score'), 4, 4, 'WHITE', 0)]));
+  return autoLayout(p);
+}
+
+const TEMPLATES = [
+  { id: 'blank', name: 'Blank (hero + D-pad)', desc: 'A moving hero and a score counter. Start here.', build: tplBlank },
+  { id: 'shooter', name: 'Shooter: Comet Guard', desc: 'Move, fire with A, comets fall faster as you score.', build: tplShooter },
+  { id: 'platformer', name: 'Platformer: Hill Hop', desc: 'Gravity, jumping, platforms, coins and spikes.', build: tplPlatformer },
+  { id: 'snake', name: 'Grid game: Worm Trail', desc: 'Grid lists, loops and a growing trail.', build: tplSnake },
+  { id: 'dodger', name: 'Dodger: Rock Rain', desc: 'Falling rocks, lives and difficulty tiers.', build: tplDodger },
+  { id: 'coins', name: 'Chase: Coin Chase', desc: 'Timer, variables and a chasing bug.', build: tplCoins }
+];
+
+const EMBED = {"builtins":["2048","AIR HOCKEY","ASTEROID DODGE","ASTEROIDS","BALLOON PUMP","BEAM DODGE","BEAT TAPPER","BLOCK STACK","BREAKOUT","BUBBLE SHOOTER","BUTTON MASH","CHECKERS","CHESS","COLOR RUSH","CONNECT FOUR","CUBE DASH","DICE DUEL","FLOOD FILL","FROGGER","FRUIT CATCH","GAP FLYER","GEM SWAP","HANGMAN","INVADERS","LIGHTS OUT","LUCKY SLOTS","LUNAR LANDER","MASTERMIND","MATH BLITZ","MAZE CHASE","MEMORY MATCH","MINESWEEPER","MISSILE CMD","MISSILE COMMAND","MONSTER BRAWL","NONOGRAM","NUMBER GUESS","PAC-MAN","PIPE LINK","PLATFORM DASH","PLINKO","PONG","PORTAL","PORTAL QUEST","REACTION TEST","RETRO CHIP-8","REVERSI","ROAD CROSS","ROAD RACER","RPS BLITZ","SIMON SEQUENCE","SKY HOP","SLIDE 15","SNAKE","SOKOBAN MINI","SPACE BLASTER","SPACE INVADERS","SPEED MAZE","SUDOKU","SUDOKU MINI","TANK DUEL","TARGET RUSH","TETRIS","TIC-TAC-TOE","TILT MAZE","TILT SLALOM","TIMING STOP","TOWER STACK","WALL PONG","WHACK-A-MOLE","WORDLE"],"carts":[{"id":"archery","name":"ARCHERY"},{"id":"bomber","name":"BOMBER ARENA"},{"id":"bowling","name":"BOWLING"},{"id":"cycles","name":"LIGHT CYCLES"},{"id":"defense","name":"BASE DEFENSE"},{"id":"dig","name":"BOULDER DIG"},{"id":"dungeon","name":"TINY DUNGEON"},{"id":"fishing","name":"FISHING"},{"id":"golf","name":"MINI GOLF"},{"id":"lifelab","name":"LIFE LAB"},{"id":"pinball","name":"PINBALL"}]};
+setBuiltinNames(EMBED.builtins); EXISTING_CARTS = EMBED.carts;
+function addBuiltinNames(list) { setBuiltinNames(BUILTIN_NAMES.concat(list)); }
+return { R, DEFS, DEF_ORDER, CATS, COLOR_NAMES, PALETTE_RGB, PALETTE, TEMPLATES, newProject, newBlock, cloneJSON, buildProject, compileProject, compileSource,
+  walkBlocks, allBlocks, autoLayout, spriteNameProblem, varNameProblem, collisionCheck, idCheck, setBuiltinNames, addBuiltinNames,
+  builtinCount: () => BUILTIN_NAMES.length, existingCount: () => EXISTING_CARTS.length, parseBuiltinText, Cart, VM, CartError, CompileError,
+  BG_RECT_MAX, BG_RECT_WARN, runCart, fnv1a, ID_RE, GENRE_WORDS, getBuiltinNames: () => BUILTIN_NAMES.slice() };
+
+})();
+if (typeof module !== "undefined" && module.exports) module.exports = ARC;
+</script>
+<script id="ui">
+(function () {
+'use strict';
+const { DEFS, DEF_ORDER, CATS, COLOR_NAMES, PALETTE_RGB, R, TEMPLATES, newProject, newBlock, cloneJSON, buildProject, walkBlocks, allBlocks,
+  autoLayout, spriteNameProblem, varNameProblem, collisionCheck, idCheck, setBuiltinNames, parseBuiltinText, Cart, VM, CartError, PALETTE, ID_RE, BG_RECT_MAX, BG_RECT_WARN } = ARC;
+
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    const v = attrs[k];
+    if (k === 'class') e.className = v;
+    else if (k === 'style') e.style.cssText = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (v === true) e.setAttribute(k, '');
+    else if (v !== false && v !== null && v !== undefined) e.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c !== null && c !== undefined && c !== false) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+}
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
+};
+const css565 = c => { const r = (c >> 8) & 0xF8, g = (c >> 3) & 0xFC, b = (c << 3) & 0xF8; return 'rgb(' + (r | r >> 5) + ',' + (g | g >> 6) + ',' + (b | b >> 5) + ')'; };
+const colCss = i => 'rgb(' + PALETTE_RGB[i].join(',') + ')';
+
+// ------------------------------------------------------------------ state
+let proj;
+let lastBuild = null;
+let curCat = 'events';
+let curTab = 'sprites';
+let selSprite = 0;
+const undoStack = [];
+function normalize(p) {
+  const base = newProject();
+  p.meta = Object.assign(base.meta, p.meta || {});
+  p.settings = Object.assign(base.settings, p.settings || {});
+  p.sprites = (p.sprites || []).map(s => Object.assign({ name: 'sprite', rows: new Array(8).fill('........'), color: 'WHITE', x: 76, y: 60, stage: true, visible: true }, s));
+  p.vars = p.vars || []; p.msgs = p.msgs || [];
+  if (!p.tiles || p.tiles.length !== 16) p.tiles = new Array(16).fill('.'.repeat(20));
+  if (!Array.isArray(p.bgTiles) || p.bgTiles.length !== 16) p.bgTiles = new Array(16).fill('.'.repeat(20));
+  p.bgTiles = p.bgTiles.map(r => (String(r) + '.'.repeat(20)).slice(0, 20).replace(/[^0-9a-f]/g, '.'));
+  p.scripts = (p.scripts || []).map(s => ({ x: s.x | 0, y: s.y | 0, blocks: s.blocks || [] }));
+  p.format = 'arcadia-gamemaker'; p.version = 1;
+  // ensure every block has a:[] c:[]
+  allBlocks(p, b => { b.a = b.a || []; b.c = b.c || []; });
+  return p;
+}
+function snapshot() { undoStack.push(JSON.stringify(proj)); if (undoStack.length > 60) undoStack.shift(); }
+function undo() {
+  if (!undoStack.length) return;
+  proj = normalize(JSON.parse(undoStack.pop()));
+  selSprite = Math.min(selSprite, proj.sprites.length - 1);
+  renderAll(); changed(true);
+}
+let buildTimer = null;
+function changed(skipRender) {
+  clearTimeout(buildTimer);
+  buildTimer = setTimeout(doBuild, 200);
+  store.set('arcadia-gamemaker-project', JSON.stringify(proj));
+}
+let wantRestart = false, restartTimer = null;
+function changedRestart() { wantRestart = true; changed(); }
+function doBuild() {
+  lastBuild = buildProject(proj);
+  renderStatus(); renderChecks(); renderCode(); renderGuard();
+  if (wantRestart) {
+    wantRestart = false;
+    clearTimeout(restartTimer);
+    if (!lastBuild.errors.length) restartTimer = setTimeout(startRun, 300);
+  }
+}
+
+// ------------------------------------------------------------------ block rendering
+function argDefault(b, idx) { const ad = DEFS[b.t].args[idx]; return ad.d === undefined ? '' : ad.d; }
+function renderBlock(b, ro, proto) {
+  const d = DEFS[b.t];
+  const cat = CATS.find(c => c.id === d.cat);
+  const e = h('div', { class: 'blk ' + d.shape + ' cat-' + d.cat + (ro ? ' ro' : '') });
+  e.style.setProperty('--c', cat.color);
+  e._blk = b;
+  if (ro) { e._palette = true; e._proto = proto || b; }
+  const row = h('div', { class: 'row' });
+  e.append(row);
+  fillLabel(row, d.label, b, d, ro);
+  if (d.shape === 'c' || d.shape === 'c2') {
+    e.append(cList(b, 0, ro));
+    if (d.shape === 'c2') {
+      e.append(h('div', { class: 'row else' }, d.label2));
+      e.append(cList(b, 1, ro));
+    }
+    e.append(h('div', { class: 'cfoot' }));
+  }
+  return e;
+}
+function cList(b, i, ro) {
+  const wrap = h('div', { class: 'cbody' });
+  const list = h('div', { class: 'list' });
+  list._arr = b.c[i];
+  if (!ro) b.c[i].forEach(x => list.append(renderBlock(x)));
+  wrap.append(list);
+  return wrap;
+}
+function fillLabel(row, label, b, d, ro) {
+  for (const part of label.split(/(%\d)/)) {
+    if (!part) continue;
+    const m = part.match(/^%(\d)$/);
+    if (!m) { row.append(h('span', { class: 't' }, part)); continue; }
+    row.append(argWidget(b, d, +m[1] - 1, ro));
+  }
+}
+function argWidget(b, d, i, ro) {
+  const ad = d.args[i];
+  let v = b.a[i];
+  const set = val => { b.a[i] = val; changed(); };
+  if (v !== null && typeof v === 'object') {
+    const slot = h('span', { class: 'slot filled', 'data-drop': 1 });
+    slot._owner = { block: b, idx: i };
+    slot.append(renderBlock(v, ro));
+    return slot;
+  }
+  if (ad.t === 'num' || ad.t === 'bool' || ad.t === 'color') {
+    const slot = h('span', { class: 'slot ' + (ad.t === 'bool' ? 'boolslot' : ''), 'data-drop': 1 });
+    slot._owner = { block: b, idx: i };
+    if (ad.t === 'bool') slot.append(h('span', { class: 'ph', title: 'drop a yes/no block here' }));
+    else if (ad.t === 'num') {
+      const inp = h('input', { class: 'in n', type: 'text', value: v === undefined ? '' : v, spellcheck: 'false', autocomplete: 'off' });
+      const fit = () => { inp.style.width = Math.max(2.4, String(inp.value).length * 0.62 + 1.4) + 'em'; inp.classList.toggle('bad', !/^\s*([+-]?\d+|0[xX][0-9a-fA-F]+)?\s*$/.test(inp.value)); };
+      fit();
+      inp.addEventListener('input', () => { fit(); set(inp.value); });
+      slot.append(inp);
+    } else {
+      const sel = h('select', { class: 'in sel col' });
+      COLOR_NAMES.forEach((n, k) => { const o = h('option', { value: n }, n.charAt(0) + n.slice(1).toLowerCase()); o.style.background = colCss(k); o.style.color = (k === 1 || k === 5 || k === 6 || k === 12 || k === 11 || k === 8 || k === 3) ? '#111' : '#fff'; sel.append(o); });
+      sel.value = String(v).toUpperCase();
+      const paint = () => { const k = COLOR_NAMES.indexOf(sel.value); sel.style.background = colCss(Math.max(k, 0)); sel.style.color = o2(k); };
+      const o2 = k => (k === 1 || k === 5 || k === 6 || k === 12 || k === 11 || k === 8 || k === 3) ? '#111' : '#fff';
+      paint();
+      sel.addEventListener('change', () => { paint(); set(sel.value); });
+      slot.append(sel);
+    }
+    return slot;
+  }
+  if (ad.t === 'text') {
+    const inp = h('input', { class: 'in t', type: 'text', value: v === undefined ? '' : v, spellcheck: 'false', maxlength: 40 });
+    const fit = () => { inp.style.width = Math.max(3, inp.value.length * 0.62 + 1.4) + 'em'; };
+    fit();
+    inp.addEventListener('input', () => { fit(); set(inp.value); });
+    return inp;
+  }
+  let opts;
+  if (ad.t === 'sprite') opts = proj.sprites.map(s => [s.name, s.name]);
+  else if (ad.t === 'var') opts = [['lives', 'lives']].concat(proj.vars.map(x => [x, x]));
+  else if (ad.t === 'msg') opts = proj.msgs.map(x => [x, x]).concat([['\u0000new', 'New message...']]);
+  else opts = ad.opts;
+  const sel = h('select', { class: 'in sel' });
+  if (!opts.length || (ad.t === 'sprite' && !opts.length)) opts = [['', '(none)']];
+  opts.forEach(o => sel.append(h('option', { value: o[1] }, o[0])));
+  if (ad.t === 'msg' && !proj.msgs.length) sel.insertBefore(h('option', { value: '' }, '(pick)'), sel.firstChild);
+  sel.value = String(v === undefined ? '' : v);
+  if (sel.value !== String(v)) { /* value missing from the list: keep it visible as an extra option so the error shows up */
+    if (v !== '' && v !== undefined) { sel.insertBefore(h('option', { value: v }, v + ' (missing)'), sel.firstChild); sel.value = v; }
+  }
+  sel.addEventListener('change', () => {
+    if (sel.value === '\u0000new') {
+      const nm = (prompt('Name of the new message (letters/digits/_):') || '').trim();
+      const err = !nm ? 'x' : (!ID_RE.test(nm) ? 'Use letters, digits and _ (start with a letter).' : (proj.msgs.includes(nm) ? 'That message exists.' : ''));
+      if (!err) { snapshot(); proj.msgs.push(nm); set(nm); renderAll(); } else { if (err !== 'x') alert(err); sel.value = String(b.a[i]); }
+      return;
+    }
+    set(sel.value);
+  });
+  return sel;
+}
+
+// ------------------------------------------------------------------ palette
+function renderCats() {
+  const nav = $('#cats'); nav.innerHTML = '';
+  CATS.forEach(c => {
+    const bt = h('button', { class: 'cat' + (c.id === curCat ? ' on' : ''), style: '--c:' + c.color, onclick: () => { curCat = c.id; renderCats(); renderPalette(); } },
+      h('i'), c.name);
+    nav.append(bt);
+  });
+}
+function renderPalette() {
+  const box = $('#plist'); box.innerHTML = '';
+  const ids = DEF_ORDER.filter(id => DEFS[id].cat === curCat);
+  const add = (proto) => { const e = renderBlock(proto, true); const w = h('div', { class: 'pitem' }, e); box.append(w); return e; };
+  if (curCat === 'vars') {
+    box.append(h('div', { class: 'phead' }, h('button', { class: 'btn small', onclick: makeVar }, 'Make a variable'),
+      h('span', { class: 'hint' }, ' ' + (proj.vars.length + 1) + ' variable(s)')));
+    for (const nm of ['lives'].concat(proj.vars)) {
+      const w = h('div', { class: 'pitem varrow' });
+      const pb = newBlock('v_get', proj); pb.a[0] = nm;
+      w.append(renderBlock(pb, true));
+      if (nm !== 'lives') {
+        w.append(h('button', { class: 'x', title: 'rename', onclick: () => renameVar(nm) }, '✎'), h('button', { class: 'x', title: 'delete variable', onclick: () => deleteVar(nm) }, '×'));
+      }
+      box.append(w);
+    }
+    box.append(h('div', { class: 'psep' }));
+  }
+  for (const id of ids) {
+    if (id === 'v_get') continue;
+    add(newBlock(id, proj));
+  }
+  if (curCat === 'events') {
+    box.append(h('div', { class: 'phead' }, h('button', { class: 'btn small', onclick: () => newMsg() }, 'New message'),
+      h('span', { class: 'hint' }, proj.msgs.length ? ' ' + proj.msgs.join(', ') : ' none yet')));
+  }
+  if (curCat === 'looks' || curCat === 'motion') {
+    if (!proj.sprites.length) box.append(h('div', { class: 'hint pad' }, 'Draw a sprite in the Sprites tab first.'));
+  }
+}
+function makeVar() {
+  const nm = (prompt('Variable name (letters, digits, _):') || '').trim();
+  if (!nm) return;
+  const pr = varNameProblem(nm, proj);
+  if (pr) { alert(pr); return; }
+  snapshot(); proj.vars.push(nm); renderAll(); changed();
+}
+function newMsg() {
+  const nm = (prompt('Message name (letters, digits, _):') || '').trim();
+  if (!nm) return;
+  if (!ID_RE.test(nm) || proj.msgs.includes(nm)) { alert('Pick a new name made of letters, digits and _'); return; }
+  snapshot(); proj.msgs.push(nm); renderAll(); changed();
+}
+function renameVar(old) {
+  const nm = (prompt('New name for "' + old + '":', old) || '').trim();
+  if (!nm || nm === old) return;
+  const pr = varNameProblem(nm, proj);
+  if (pr) { alert(pr); return; }
+  snapshot();
+  allBlocks(proj, b => { const dd = DEFS[b.t]; if (dd) dd.args.forEach((ad, i) => { if (ad.t === 'var' && b.a[i] === old) b.a[i] = nm; }); });
+  proj.vars[proj.vars.indexOf(old)] = nm;
+  renderAll(); changed();
+}
+function deleteVar(nm) {
+  let uses = 0;
+  allBlocks(proj, b => { const dd = DEFS[b.t]; if (dd) dd.args.forEach((ad, i) => { if (ad.t === 'var' && b.a[i] === nm) uses++; }); });
+  if (uses && !confirm('"' + nm + '" is used by ' + uses + ' block(s). Those will switch to "lives". Delete anyway?')) return;
+  snapshot();
+  allBlocks(proj, b => { const dd = DEFS[b.t]; if (dd) dd.args.forEach((ad, i) => { if (ad.t === 'var' && b.a[i] === nm) b.a[i] = 'lives'; }); });
+  proj.vars = proj.vars.filter(x => x !== nm);
+  renderAll(); changed();
+}
+
+// ------------------------------------------------------------------ workspace
+function renderWorkspace() {
+  const inner = $('#wsInner'); inner.innerHTML = '';
+  proj.scripts = proj.scripts.filter(s => s.blocks.length);
+  proj.scripts.forEach(s => {
+    const sc = h('div', { class: 'script' });
+    sc.style.left = s.x + 'px'; sc.style.top = s.y + 'px';
+    const first = DEFS[s.blocks[0].t];
+    if (!first || first.shape !== 'hat') sc.classList.add('orphan');
+    const list = h('div', { class: 'list root' });
+    list._arr = s.blocks; list._script = s;
+    s.blocks.forEach(b => list.append(renderBlock(b)));
+    sc.append(list);
+    sc._script = s;
+    inner.append(sc);
+  });
+  let mx = 800, my = 600;
+  $$('.script', inner).forEach(sc => { mx = Math.max(mx, sc.offsetLeft + sc.offsetWidth + 300); my = Math.max(my, sc.offsetTop + sc.offsetHeight + 300); });
+  inner.style.width = mx + 'px'; inner.style.height = my + 'px';
+  $('#wsHint').style.display = proj.scripts.length ? 'none' : 'block';
+}
+function locate(target) {
+  for (const s of proj.scripts) {
+    const r = searchList(s.blocks, target, s);
+    if (r) return r;
+  }
+  return null;
+}
+function searchList(list, target, script) {
+  for (let i = 0; i < list.length; i++) {
+    const x = list[i];
+    if (x === target) return { kind: 'list', arr: list, idx: i, script };
+    const r = searchBlock(x, target, script);
+    if (r) return r;
+  }
+  return null;
+}
+function searchBlock(x, target, script) {
+  for (let k = 0; k < x.a.length; k++) {
+    const v = x.a[k];
+    if (v && typeof v === 'object') {
+      if (v === target) return { kind: 'arg', owner: x, idx: k };
+      const r = searchBlock(v, target, script);
+      if (r) return r;
+    }
+  }
+  for (const c of x.c) { const r = searchList(c, target, script); if (r) return r; }
+  return null;
+}
+
+// ---- drag & drop
+let drag = null;
+const ghost = () => $('#ghost');
+document.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || drag) return;
+  if (e.target.closest('input,select,button,textarea,option')) return;
+  const be = e.target.closest('.blk');
+  if (!be) return;
+  closeMenu();
+  const rect = be.getBoundingClientRect();
+  let chain;
+  if (be._palette) {
+    chain = [cloneJSON(be._proto)];
+  } else {
+    const b = be._blk;
+    const loc = locate(b);
+    if (!loc) return;
+    snapshot();
+    if (loc.kind === 'list') {
+      chain = loc.arr.splice(loc.idx);
+    } else {
+      chain = [b];
+      loc.owner.a[loc.idx] = argDefault(loc.owner, loc.idx);
+    }
+    renderWorkspace();
+  }
+  const g = ghost();
+  g.innerHTML = '';
+  const holder = h('div', { class: 'list' });
+  chain.forEach(c => holder.append(renderBlock(c, true)));
+  g.append(holder);
+  g.style.display = 'block';
+  drag = { chain, dx: e.clientX - rect.left, dy: e.clientY - rect.top, fromPalette: !!be._palette, target: null };
+  moveGhost(e);
+  e.preventDefault();
+});
+document.addEventListener('pointermove', e => { if (drag) { moveGhost(e); } });
+document.addEventListener('pointerup', e => { if (drag) { moveGhost(e); finishDrag(e); } });
+document.addEventListener('pointercancel', e => { if (drag) { cancelDrag(); } });
+function moveGhost(e) {
+  const g = ghost();
+  g.style.left = (e.clientX - drag.dx) + 'px';
+  g.style.top = (e.clientY - drag.dy) + 'px';
+  drag.px = e.clientX; drag.py = e.clientY;
+  drag.target = computeTarget();
+  showIndicator(drag.target);
+}
+function cancelDrag() { ghost().style.display = 'none'; hideIndicator(); drag = null; renderWorkspace(); }
+function inRect(x, y, r) { return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }
+function computeTarget() {
+  const chain = drag.chain, first = chain[0], fd = DEFS[first.t];
+  const g = ghost().getBoundingClientRect();
+  const pal = $('#palette').getBoundingClientRect();
+  if (inRect(drag.px, drag.py, pal)) return { kind: 'delete' };
+  const wsr = $('#ws').getBoundingClientRect();
+  const insideWs = inRect(drag.px, drag.py, wsr);
+  if (!insideWs) return { kind: 'free', outside: true };
+  if (fd.shape === 'rep' || fd.shape === 'bool') {
+    let best = null, bd = 44;
+    $$('#wsInner .slot[data-drop]').forEach(s => {
+      const r = s.getBoundingClientRect();
+      let dist = Math.hypot(g.left - r.left, (g.top + g.height / 2) - (r.top + r.height / 2));
+      if (inRect(drag.px, drag.py, r)) dist = Math.min(dist, 2);
+      if (dist < bd) { bd = dist; best = s; }
+    });
+    return best ? { kind: 'slot', el: best } : { kind: 'free' };
+  }
+  if (fd.shape === 'hat') return { kind: 'free' };
+  let best = null, bd = 46;
+  $$('#wsInner .list').forEach(L => {
+    const arr = L._arr;
+    const kids = Array.from(L.children).filter(c => c.classList.contains('blk'));
+    const lr = L.getBoundingClientRect();
+    for (let i = 0; i <= kids.length; i++) {
+      let px, py;
+      if (i < kids.length) { const r = kids[i].getBoundingClientRect(); px = r.left; py = r.top; }
+      else if (kids.length) { const r = kids[i - 1].getBoundingClientRect(); px = r.left; py = r.bottom; }
+      else { px = lr.left; py = lr.top; }
+      if (i === 0 && arr.length && DEFS[arr[0].t].shape === 'hat') continue;
+      let dist = Math.hypot(g.left - px, g.top - py);
+      if (i === 0 && kids.length) dist = Math.min(dist, Math.hypot(g.left - px, g.bottom - py));
+      if (dist < bd) { bd = dist; best = { kind: 'list', arr, idx: i, x: px, y: py }; }
+    }
+  });
+  return best || { kind: 'free' };
+}
+function showIndicator(t) {
+  const ind = $('#dropind');
+  $$('.slot.hot').forEach(s => s.classList.remove('hot'));
+  $('#palette').classList.toggle('deleting', !!(t && t.kind === 'delete'));
+  if (t && t.kind === 'list') {
+    ind.style.display = 'block'; ind.style.left = t.x + 'px'; ind.style.top = (t.y - 2) + 'px';
+  } else ind.style.display = 'none';
+  if (t && t.kind === 'slot') t.el.classList.add('hot');
+}
+function hideIndicator() { $('#dropind').style.display = 'none'; $$('.slot.hot').forEach(s => s.classList.remove('hot')); $('#palette').classList.remove('deleting'); }
+function finishDrag(e) {
+  const t = drag.target, chain = drag.chain;
+  const g = ghost().getBoundingClientRect();
+  ghost().style.display = 'none'; hideIndicator();
+  const fd = DEFS[chain[0].t];
+  const isVal = fd.shape === 'rep' || fd.shape === 'bool';
+  if (drag.fromPalette) snapshot();
+  let applied = true;
+  if (!t || t.kind === 'delete') { /* discard */ }
+  else if (t.kind === 'slot') {
+    const o = t.el._owner;
+    o.block.a[o.idx] = chain[0];
+  } else if (t.kind === 'list') {
+    t.arr.splice(t.idx, 0, ...chain);
+  } else if (t.kind === 'free') {
+    if (isVal) { applied = false; }
+    else {
+      const wsr = $('#ws').getBoundingClientRect(), ws = $('#ws');
+      proj.scripts.push({ x: Math.max(4, Math.round(g.left - wsr.left + ws.scrollLeft)), y: Math.max(4, Math.round(g.top - wsr.top + ws.scrollTop)), blocks: chain });
+    }
+  }
+  if (!applied && drag.fromPalette) undoStack.pop();
+  drag = null;
+  renderWorkspace(); changed();
+}
+// context menu
+let menuEl = null;
+function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+document.addEventListener('contextmenu', e => {
+  const be = e.target.closest('#wsInner .blk');
+  if (!be) return;
+  e.preventDefault();
+  closeMenu();
+  const b = be._blk;
+  const loc = locate(b);
+  if (!loc) return;
+  const item = (label, fn) => h('button', { onclick: () => { closeMenu(); fn(); } }, label);
+  menuEl = h('div', { class: 'menu', style: 'left:' + e.clientX + 'px;top:' + e.clientY + 'px' },
+    item('Duplicate block', () => {
+      snapshot();
+      const c = cloneJSON(b);
+      if (loc.kind === 'list') loc.arr.splice(loc.idx + 1, 0, c);
+      else { proj.scripts.push({ x: 40, y: 40, blocks: [c] }); }
+      renderWorkspace(); changed();
+    }),
+    item('Delete block', () => {
+      snapshot();
+      if (loc.kind === 'list') loc.arr.splice(loc.idx, 1); else loc.owner.a[loc.idx] = argDefault(loc.owner, loc.idx);
+      renderWorkspace(); changed();
+    }),
+    loc.kind === 'list' && loc.idx < loc.arr.length - 1 ? item('Delete this and everything below', () => { snapshot(); loc.arr.splice(loc.idx); renderWorkspace(); changed(); }) : null);
+  document.body.append(menuEl);
+});
+document.addEventListener('click', e => { if (menuEl && !e.target.closest('.menu')) closeMenu(); });
+
+function cleanUp(noSnap) {
+  if (noSnap !== true) snapshot();
+  const els = $$('#wsInner .script');
+  const heights = proj.scripts.map((s, i) => (els[i] ? els[i].offsetHeight : 0));
+  autoLayout(proj, heights);
+  renderWorkspace(); changed();
+}
+
+// ------------------------------------------------------------------ sprites tab
+function swatchRow(getIdx, onPick, withNone) {
+  const row = h('div', { class: 'swatches' });
+  const btns = [];
+  const mark = () => btns.forEach(([bt, v]) => bt.classList.toggle('on', v === getIdx()));
+  if (withNone) { const bt = h('button', { class: 'sw none', type: 'button', title: 'none / erase' }); bt.addEventListener('click', () => { onPick(-1); mark(); }); btns.push([bt, -1]); row.append(bt); }
+  COLOR_NAMES.forEach((n, i) => {
+    const bt = h('button', { class: 'sw', type: 'button', title: n.charAt(0) + n.slice(1).toLowerCase() });
+    bt.style.background = colCss(i);
+    bt.addEventListener('click', () => { onPick(i); mark(); });
+    btns.push([bt, i]); row.append(bt);
+  });
+  mark();
+  return row;
+}
+function spritePane() {
+  const pane = h('div', { class: 'pane' });
+  const sp = proj.sprites[selSprite] || null;
+  const list = h('div', { class: 'sprlist' });
+  const pick = i => { selSprite = i; renderPanes(); const g = $('.edwrap'); if (g && g.scrollIntoView) g.scrollIntoView({ block: 'nearest' }); };
+  proj.sprites.forEach((s, i) => {
+    const b = h('button', { class: 'sprthumb' + (i === selSprite ? ' on' : ''), title: s.name, onclick: () => pick(i) }, thumb(s.rows, s.color), h('span', {}, s.name));
+    list.append(b);
+  });
+  list.append(h('button', { class: 'sprthumb add', onclick: addSprite }, h('b', {}, '+'), h('span', {}, 'new')));
+  list.append(h('button', { class: 'sprthumb' + (selSprite === -1 ? ' on' : ''), onclick: () => pick(-1), title: 'The 8x8 picture shown in the game picker' }, thumb(proj.meta.icon, 'WHITE'), h('span', {}, 'icon')));
+  const listBox = h('div', {}, h('div', { class: 'hint' }, 'Your sprites (click one to edit it):'), list);
+  if (selSprite === -1) {
+    pane.append(h('div', { class: 'hint' }, 'Editing: the game icon. Click or drag on the big grid to paint, right-drag erases.'));
+    pane.append(editorFor(proj.meta.icon, 'WHITE', rows => { proj.meta.icon = rows; }, true));
+    pane.append(h('div', { class: 'row2' }, h('button', { class: 'btn small', onclick: () => { if (proj.sprites[0]) { snapshot(); proj.meta.icon = proj.sprites[Math.max(0, Math.min(selSprite, 0))].rows.slice(); renderPanes(); changed(); } } }, 'Copy first sprite'),
+      h('span', { class: 'hint' }, 'This tiny picture is shown next to your game name in the picker.')));
+    pane.append(listBox);
+    return pane;
+  }
+  if (!sp) { pane.append(listBox, h('p', { class: 'hint pad' }, 'No sprites yet. Click + to draw one.')); return pane; }
+  pane.append(h('div', { class: 'hint' }, 'Editing sprite "' + sp.name + '": click or drag on the big grid to paint, right-drag erases. A sprite has one colour (pick it below).'));
+  pane.append(editorFor(sp.rows, sp.color, rows => { sp.rows = rows; }, false));
+  pane.append(listBox);
+  const f = (label, input) => h('label', { class: 'f' }, h('span', {}, label), input);
+  const nm = h('input', { type: 'text', value: sp.name, maxlength: 12, spellcheck: 'false' });
+  const nmMsg = h('div', { class: 'bad nmbad', role: 'alert', style: 'display:none' });
+  const showMsg = t => { nmMsg.textContent = t || ''; nmMsg.style.display = t ? 'block' : 'none'; nm.style.borderColor = t ? 'var(--bad)' : ''; };
+  nm.addEventListener('input', () => { const v = nm.value.trim(); const pr = v === sp.name ? '' : spriteNameProblem(v, proj, selSprite); showMsg(pr ? 'Name not accepted: ' + pr + ' (the old name "' + sp.name + '" is kept)' : ''); });
+  nm.addEventListener('change', () => {
+    const v = nm.value.trim();
+    const pr = spriteNameProblem(v, proj, selSprite);
+    if (pr) { showMsg('Name not accepted: ' + pr + ' (the old name "' + sp.name + '" is kept)'); nm.value = sp.name; return; }
+    showMsg('');
+    snapshot();
+    const old = sp.name;
+    allBlocks(proj, b => { const dd = DEFS[b.t]; if (dd) dd.args.forEach((ad, i) => { if (ad.t === 'sprite' && b.a[i] === old) b.a[i] = v; }); });
+    sp.name = v; renderAll(); changedRestart();
+  });
+  const colRow = swatchRow(() => Math.max(0, COLOR_NAMES.indexOf(sp.color)), i => { snapshot(); sp.color = COLOR_NAMES[Math.max(0, i)]; renderPanes(); changedRestart(); });
+  const num = (key, min, max) => { const i = h('input', { type: 'number', value: sp[key], min, max, style: 'width:64px' }); i.addEventListener('input', () => { sp[key] = Math.max(min, Math.min(max, parseInt(i.value, 10) || 0)); changedRestart(); }); return i; };
+  const chk = (key) => { const i = h('input', { type: 'checkbox' }); i.checked = sp[key] !== false; i.addEventListener('change', () => { sp[key] = i.checked; changedRestart(); }); return i; };
+  pane.append(h('div', { class: 'form' }, f('Name', nm), nmMsg, f('Colour', colRow), f('Start x', num('x', -64, 223)), f('Start y', num('y', -64, 191)),
+    f('Shown on stage automatically', chk('stage')), f('Visible at start', chk('visible'))));
+  pane.append(h('div', { class: 'row2' },
+    h('button', { class: 'btn small', onclick: dupSprite }, 'Duplicate'),
+    h('button', { class: 'btn small danger', onclick: delSprite }, 'Delete sprite'),
+    h('span', { class: 'hint' }, 'Blocks refer to sprites by name. 8x8 pixels, up to 64 sprites.')));
+  return pane;
+}
+function thumb(rows, color) {
+  const cv = h('canvas', { width: 8, height: 8, class: 'thumb' });
+  const c = cv.getContext('2d');
+  c.fillStyle = colCss(Math.max(0, COLOR_NAMES.indexOf(color)));
+  rows.forEach((r, y) => { for (let x = 0; x < 8; x++) if (r[x] === '#') c.fillRect(x, y, 1, 1); });
+  return cv;
+}
+function editorFor(rows, color, setRows, isIcon) {
+  const wrap = h('div', { class: 'edwrap' });
+  const grid = h('div', { class: 'pgrid' });
+  const cells = [];
+  const colr = colCss(Math.max(0, COLOR_NAMES.indexOf(color)));
+  const draw = () => cells.forEach((c, i) => { c.style.background = rows[(i / 8) | 0][i % 8] === '#' ? (isIcon ? '#fff' : colr) : ''; });
+  for (let i = 0; i < 64; i++) { const c = h('div', { class: 'pc', 'data-i': i }); cells.push(c); grid.append(c); }
+  draw();
+  let paintVal = null, painting = false;
+  const setCell = (i, val) => {
+    const y = (i / 8) | 0, x = i % 8;
+    if ((rows[y][x] === '#') === val) return;
+    rows[y] = rows[y].slice(0, x) + (val ? '#' : '.') + rows[y].slice(x + 1);
+    draw();
+  };
+  grid.addEventListener('pointerdown', e => {
+    const c = e.target.closest('.pc'); if (!c) return;
+    snapshot();
+    const i = +c.dataset.i;
+    paintVal = e.button === 2 ? false : rows[(i / 8) | 0][i % 8] !== '#';
+    painting = true;
+    grid.setPointerCapture(e.pointerId);
+    setCell(i, paintVal);
+    e.preventDefault();
+  });
+  grid.addEventListener('pointermove', e => {
+    if (!painting) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const c = el && el.closest && el.closest('.pc');
+    if (c && grid.contains(c)) setCell(+c.dataset.i, paintVal);
+  });
+  const end = () => { if (painting) { painting = false; setRows(rows); renderThumbsOnly(); changedRestart(); } };
+  grid.addEventListener('pointerup', end); grid.addEventListener('pointercancel', end);
+  grid.addEventListener('contextmenu', e => e.preventDefault());
+  const apply = fn => { snapshot(); const nr = fn(rows.map(r => r.split(''))).map(r => r.join('')); setRows(nr); renderPanes(); changedRestart(); };
+  const tools = h('div', { class: 'ptools' },
+    ...[['Clear', g => g.map(r => r.map(() => '.'))], ['Invert', g => g.map(r => r.map(c => c === '#' ? '.' : '#'))],
+    ['←', g => g.map(r => r.slice(1).concat(r[0]))], ['→', g => g.map(r => [r[7]].concat(r.slice(0, 7)))],
+    ['↑', g => g.slice(1).concat([g[0]])], ['↓', g => [g[7]].concat(g.slice(0, 7))],
+    ['Flip ↔', g => g.map(r => r.slice().reverse())], ['Flip ↕', g => g.slice().reverse()]]
+      .map(([n, fn]) => h('button', { class: 'btn small', onclick: () => apply(fn) }, n)));
+  wrap.append(grid, h('div', {}, tools, h('div', { class: 'hint' }, 'Click or drag to paint. Right-drag erases. The arrows shift the picture, Flip mirrors it.')));
+  return wrap;
+}
+function renderThumbsOnly() { $$('.sprthumb canvas.thumb').forEach(() => { }); const l = $('.sprlist'); if (l) { const np = spritePane(); /* cheap: re-render list only */ l.replaceWith($('.sprlist', np)); } }
+function uniqueSpriteName(base) {
+  let i = 1;
+  while (proj.sprites.some(s => s.name === base + i)) i++;
+  return base + i;
+}
+function addSprite() {
+  if (proj.sprites.length >= R.SPR_MAX) { alert('Maximum of ' + R.SPR_MAX + ' sprites.'); return; }
+  snapshot();
+  proj.sprites.push({ name: uniqueSpriteName('sprite'), rows: ['..####..', '.#....#.', '#.#..#.#', '#......#', '#.#..#.#', '#..##..#', '.#....#.', '..####..'], color: 'WHITE', x: 76, y: 60, stage: true, visible: true });
+  selSprite = proj.sprites.length - 1;
+  renderAll(); changedRestart();
+}
+function dupSprite() {
+  if (proj.sprites.length >= R.SPR_MAX) return;
+  snapshot();
+  const s = cloneJSON(proj.sprites[selSprite]); s.name = uniqueSpriteName(s.name.replace(/\d+$/, ''));
+  proj.sprites.splice(selSprite + 1, 0, s); selSprite++;
+  renderAll(); changedRestart();
+}
+function delSprite() {
+  const s = proj.sprites[selSprite]; if (!s) return;
+  let uses = 0; allBlocks(proj, b => { const dd = DEFS[b.t]; if (dd) dd.args.forEach((ad, i) => { if (ad.t === 'sprite' && b.a[i] === s.name) uses++; }); });
+  if (!confirm('Delete sprite "' + s.name + '"?' + (uses ? ' ' + uses + ' block(s) use it and will show an error until you pick another sprite.' : ''))) return;
+  snapshot();
+  proj.sprites.splice(selSprite, 1);
+  selSprite = Math.min(selSprite, proj.sprites.length - 1);
+  renderAll(); changed();
+}
+
+// ------------------------------------------------------------------ level (platform tile layer)
+let levelMode = 'plat', bgSel = 5;
+function bgRectCount(bt) {
+  const g = bt.map(r => r.split('')); let n = 0;
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 20; x++) {
+    const c = g[y][x]; if (c === '.') continue;
+    let w = 1; while (x + w < 20 && g[y][x + w] === c) w++;
+    let hh = 1; while (y + hh < 16 && g[y + hh].slice(x, x + w).every(q => q === c)) hh++;
+    for (let yy = 0; yy < hh; yy++) for (let xx = 0; xx < w; xx++) g[y + yy][x + xx] = '.';
+    n++;
+  }
+  return n;
+}
+function levelPane() {
+  const pane = h('div', { class: 'pane' });
+  const S = proj.settings;
+  const grid = h('div', { class: 'lgrid' });
+  const cells = [];
+  for (let i = 0; i < 320; i++) { const c = h('div', { class: 'lc', 'data-i': i }); cells.push(c); grid.append(c); }
+  let sel = null;
+  const mark = {};
+  proj.sprites.forEach(s => { const cx = Math.floor((s.x + 4) / 8), cy = Math.floor((s.y + 4) / 8); if (cx >= 0 && cx < 20 && cy >= 0 && cy < 16) mark[cy * 20 + cx] = s; });
+  const bgIdx = () => Math.max(0, COLOR_NAMES.indexOf(S.bg));
+  const countEl = h('span', { class: 'hint' });
+  const draw = () => {
+    grid.style.setProperty('--cbg', colCss(bgIdx()));
+    cells.forEach((c, i) => {
+      const x = i % 20, y = (i / 20) | 0;
+      const inSel = levelMode === 'plat' && sel && x >= sel.x0 && x <= sel.x1 && y >= sel.y0 && y <= sel.y1;
+      const solid = proj.tiles[y][x] === '#';
+      c.className = 'lc' + (solid ? ' solid' : '') + (inSel ? (sel.erase ? ' selE' : ' selF') : '');
+      c.style.setProperty('--pc', colCss(Math.max(0, COLOR_NAMES.indexOf(S.platColor))));
+      const bc = proj.bgTiles[y][x];
+      c.style.background = (!inSel && !solid && bc !== '.') ? colCss(parseInt(bc, 16)) : '';
+      const m = mark[i];
+      c.textContent = m ? m.name.charAt(0).toUpperCase() : '';
+      c.title = m ? m.name + ' starts here' : '';
+    });
+    const n = bgRectCount(proj.bgTiles);
+    countEl.textContent = n ? 'Background uses ' + n + ' of ' + BG_RECT_MAX + ' rectangles.' : '';
+    countEl.className = 'hint' + (n > BG_RECT_MAX ? ' bad' : n > BG_RECT_WARN ? ' warn' : '');
+  };
+  draw();
+  let start = null, painting = false, paintVal = null;
+  const cellAt = e => { const el = document.elementFromPoint(e.clientX, e.clientY); const c = el && el.closest && el.closest('.lc'); return c && grid.contains(c) ? +c.dataset.i : null; };
+  const setBg = (i, ch) => { const x = i % 20, y = (i / 20) | 0; const r = proj.bgTiles[y]; if (r[x] === ch) return; proj.bgTiles[y] = r.slice(0, x) + ch + r.slice(x + 1); draw(); };
+  grid.addEventListener('pointerdown', e => {
+    const i = cellAt(e); if (i === null) return;
+    if (levelMode === 'bg') {
+      snapshot(); painting = true; paintVal = (e.button === 2 || bgSel < 0) ? '.' : bgSel.toString(16);
+      grid.setPointerCapture(e.pointerId); setBg(i, paintVal); e.preventDefault(); return;
+    }
+    start = { x: i % 20, y: (i / 20) | 0, erase: e.button === 2 };
+    sel = { x0: start.x, x1: start.x, y0: start.y, y1: start.y, erase: start.erase };
+    grid.setPointerCapture(e.pointerId); draw(); e.preventDefault();
+  });
+  grid.addEventListener('pointermove', e => {
+    if (painting) { const i = cellAt(e); if (i !== null) setBg(i, paintVal); return; }
+    if (!start) return;
+    const i = cellAt(e); if (i === null) return;
+    const x = i % 20, y = (i / 20) | 0;
+    sel = { x0: Math.min(start.x, x), x1: Math.max(start.x, x), y0: Math.min(start.y, y), y1: Math.max(start.y, y), erase: start.erase };
+    draw();
+  });
+  const end = () => {
+    if (painting) { painting = false; changedRestart(); return; }
+    if (!start || !sel) { start = null; return; }
+    snapshot();
+    for (let y = sel.y0; y <= sel.y1; y++) {
+      const row = proj.tiles[y].split('');
+      for (let x = sel.x0; x <= sel.x1; x++) row[x] = sel.erase ? '.' : '#';
+      proj.tiles[y] = row.join('');
+    }
+    start = null; sel = null; draw(); changedRestart();
+  };
+  grid.addEventListener('pointerup', end); grid.addEventListener('pointercancel', end);
+  grid.addEventListener('contextmenu', e => e.preventDefault());
+  const colSel = h('select', {}, COLOR_NAMES.map(n => h('option', { value: n }, n.charAt(0) + n.slice(1).toLowerCase())));
+  colSel.value = S.platColor || 'ORANGE';
+  colSel.addEventListener('change', () => { S.platColor = colSel.value; draw(); changedRestart(); });
+  const chk = h('input', { type: 'checkbox' }); chk.checked = S.autoDrawPlatforms !== false;
+  chk.addEventListener('change', () => { S.autoDrawPlatforms = chk.checked; changedRestart(); });
+  const seg = h('div', { class: 'seg' });
+  [['plat', 'Platforms'], ['bg', 'Background']].forEach(([id, nm]) => seg.append(h('button', { type: 'button', class: levelMode === id ? 'on' : '', onclick: () => { levelMode = id; renderPanes(); } }, nm)));
+  const bgPick = swatchRow(bgIdx, i => { snapshot(); S.bg = COLOR_NAMES[Math.max(0, i)]; draw(); changedRestart(); }, false);
+  pane.append(h('div', { class: 'row2' }, h('b', {}, 'Level mode '), seg));
+  if (levelMode === 'bg') {
+    const pal = swatchRow(() => bgSel, i => { bgSel = i; }, true);
+    pane.append(h('div', { class: 'hint' }, 'Background painter: pick a colour, then click or drag on the grid to paint 8x8-pixel tiles. Right-drag (or the striped swatch) erases to the plain background colour. Painted tiles are drawn behind platforms and sprites.'),
+      pal, grid,
+      h('div', { class: 'row2' },
+        h('button', { class: 'btn small', onclick: () => { snapshot(); const ch = bgSel < 0 ? '.' : bgSel.toString(16); proj.bgTiles = new Array(16).fill(ch.repeat(20)); renderPanes(); changedRestart(); } }, 'Fill all'),
+        h('button', { class: 'btn small', onclick: () => { snapshot(); proj.bgTiles = new Array(16).fill('.'.repeat(20)); renderPanes(); changedRestart(); } }, 'Clear background'), countEl));
+  } else {
+    pane.append(h('div', { class: 'hint' }, 'Drag a rectangle to place platforms (8x8-pixel tiles, 20 x 16). Right-drag erases. Letters show where sprites start. The Platformer blocks make sprites land on these tiles.'),
+      grid,
+      h('div', { class: 'row2' },
+        h('button', { class: 'btn small', onclick: () => { snapshot(); proj.tiles = new Array(16).fill('.'.repeat(20)); renderPanes(); changedRestart(); } }, 'Clear'),
+        h('button', { class: 'btn small', onclick: () => { snapshot(); proj.tiles[14] = '#'.repeat(20); proj.tiles[15] = '#'.repeat(20); renderPanes(); changedRestart(); } }, 'Add floor'),
+        h('label', { class: 'hint' }, 'Platform colour '), colSel, h('label', { class: 'hint' }, chk, ' draw platforms automatically')));
+  }
+  pane.append(h('div', { class: 'row2' }, h('label', { class: 'hint' }, 'Background colour '), bgPick));
+  return pane;
+}
+
+// ------------------------------------------------------------------ project tab
+function projectPane() {
+  const M = proj.meta, S = proj.settings;
+  const pane = h('div', { class: 'pane' });
+  const text = (obj, key, max, extra) => {
+    const i = h('input', { type: 'text', value: obj[key], maxlength: max || 40, spellcheck: 'false' });
+    i.addEventListener('input', () => { obj[key] = extra ? extra(i.value) : i.value; if (extra) i.value = obj[key]; changed(); renderGuard(); });
+    return i;
+  };
+  const f = (label, input, note) => h('label', { class: 'f' }, h('span', {}, label), input, note || null);
+  const sel = (obj, key, opts) => { const s = h('select', {}, opts.map(o => h('option', { value: o }, o.charAt(0) + o.slice(1).toLowerCase()))); s.value = obj[key]; s.addEventListener('change', () => { obj[key] = s.value; (obj === S ? changedRestart : changed)(); }); return s; };
+  const chk = (obj, key, cb) => { const i = h('input', { type: 'checkbox' }); i.checked = !!obj[key]; i.addEventListener('change', () => { obj[key] = i.checked; (obj === S ? changedRestart : changed)(); if (cb) cb(); }); return i; };
+  const num = (obj, key, min, max) => { const i = h('input', { type: 'number', value: obj[key], min, max, style: 'width:70px' }); i.addEventListener('input', () => { obj[key] = Math.max(min, Math.min(max, parseInt(i.value, 10) || 0)); (obj === S ? changedRestart : changed)(); }); return i; };
+  const cats = ['', 'Arcade', 'Reflex', 'Puzzle', 'Strategy', 'Battle'];
+  const blurbCat = h('select', {}, cats.map(c => h('option', { value: c }, c || '(no category)')));
+  const m = (M.blurb || '').match(/^(Arcade|Reflex|Puzzle|Strategy|Battle):\s*/);
+  blurbCat.value = m ? m[1] : '';
+  const blurb = text(M, 'blurb', 23);
+  blurbCat.addEventListener('change', () => {
+    const rest = (M.blurb || '').replace(/^(Arcade|Reflex|Puzzle|Strategy|Battle):\s*/, '');
+    M.blurb = (blurbCat.value ? blurbCat.value + ': ' : '') + rest; blurb.value = M.blurb; changed(); renderGuard();
+  });
+  pane.append(h('div', { class: 'form' },
+    f('Game name (max 15)', text(M, 'name', 15, v => v.toUpperCase())),
+    f('Cart file ID', text(M, 'id', 15, v => v.toLowerCase().replace(/[^a-z0-9_]/g, '')), h('span', { class: 'hint' }, '.arc file name')),
+    h('div', { id: 'guard', class: 'guard' }),
+    f('Picker category', blurbCat), f('Blurb (max 23)', blurb),
+    f('Author', text(M, 'author', 15)), f('Picker colour', sel(M, 'color', COLOR_NAMES)), f('Version', num(M, 'version', 0, 255)),
+    f('Two players (hot-seat)', chk(M, 'twop')), f('Lower score is better', chk(M, 'lower'))));
+  const tiers = h('div', { class: 'form' }, h('b', {}, 'Difficulty names (max 7 characters; read with "difficulty")'));
+  for (let i = 0; i < 4; i++) tiers.append(f('Level ' + i, text(M.tiers, i, 7, v => v.toUpperCase())));
+  pane.append(tiers);
+  const help = h('div', { class: 'form' }, h('b', {}, 'How-to-play lines (max 23 characters)'));
+  for (let i = 0; i < 3; i++) { M.help[i] = M.help[i] || ''; help.append(f('Line ' + (i + 1), text(M.help, i, 23))); }
+  pane.append(help);
+  const bgSel = sel(S, 'bg', COLOR_NAMES);
+  pane.append(h('div', { class: 'form' }, h('b', {}, 'Game settings'),
+    f('Clear the screen every frame', chk(S, 'autoClear')), f('Background colour', bgSel), h('div', { class: 'hint' }, 'Also in Level tab. Paint a whole picture there with Background mode.'),
+    f('Draw sprites automatically', chk(S, 'autoDraw')), f('Starting lives', num(S, 'lives', 0, 99)),
+    h('div', { class: 'hint' }, 'If you turn off clearing, the compiler repaints a background box behind every number and text block, because cart text is transparent.')));
+  return pane;
+}
+function renderGuard() {
+  const g = $('#guard'); if (!g) return;
+  const [ne, nw] = collisionCheck(proj.meta.name, proj.meta.blurb);
+  const [ie, iw] = idCheck(proj.meta.id, proj.meta.name);
+  g.innerHTML = '';
+  const all = ne.map(t => [1, t]).concat(ie.map(t => [1, t]), nw.map(t => [0, t]), iw.map(t => [0, t]));
+  if (!all.length) g.append(h('div', { class: 'ok' }, 'Name and ID are free of clashes with the ' + ARC.builtinCount() + ' built-in games and ' + ARC.existingCount() + ' sample carts.'));
+  all.forEach(([bad, t]) => g.append(h('div', { class: bad ? 'bad' : 'warn' }, (bad ? 'ERROR: ' : 'Warning: ') + t)));
+}
+
+// ------------------------------------------------------------------ checks + code tabs
+function checksPane() {
+  const pane = h('div', { class: 'pane', id: 'checksPane' });
+  fillChecks(pane);
+  return pane;
+}
+function fillChecks(pane) {
+  pane.innerHTML = '';
+  const b = lastBuild;
+  if (!b) { pane.append(h('p', { class: 'hint pad' }, 'Building...')); return; }
+  if (!b.errors.length && !b.guardErrors.length) pane.append(h('div', { class: 'ok big' }, 'Ready: ' + (b.stats ? b.stats.bytes + ' bytes' : '')));
+  b.errors.forEach(t => pane.append(h('div', { class: 'bad' }, t)));
+  b.guardErrors.forEach(t => pane.append(h('div', { class: 'bad' }, 'Name/ID guard: ' + t)));
+  b.warnings.forEach(t => pane.append(h('div', { class: 'warn' }, 'Warning: ' + t)));
+  if (b.stats) {
+    const st = b.stats, row = (l, v, max) => h('div', { class: 'stat' }, h('span', {}, l), h('b', {}, v + (max ? ' / ' + max : '')),
+      max ? h('i', { style: 'width:' + Math.min(100, v * 100 / max) + '%' }) : null);
+    pane.append(h('div', { class: 'stats' }, row('Cart file', st.bytes, 14000), row('Code', st.code, R.CODE_MAX), row('Strings', st.strs, R.STR_MAX),
+      row('Variables', st.globals, R.GLOBALS_MAX), row('Memory words', st.mem, R.MEM_MAX), row('Sprites', st.sprites, R.SPR_MAX)));
+  }
+  pane.append(h('div', { class: 'hint pad' }, 'Speed limit: ' + R.BUDGET + ' VM steps per frame. Watch "steps" under the preview; keep it well below the limit.'));
+  const fi = h('input', { type: 'file', accept: '.txt', style: 'display:none' });
+  fi.addEventListener('change', () => {
+    const f = fi.files[0]; if (!f) return;
+    f.text().then(t => { const names = parseBuiltinText(t); if (names.length < 10) { alert('That does not look like builtin_games.txt'); return; } ARC.addBuiltinNames(names); store.set('arcadia-gamemaker-builtins', names.join('\n')); doBuild(); });
+  });
+  pane.append(h('div', { class: 'row2' }, h('button', { class: 'btn small', onclick: () => fi.click() }, 'Reload built-in game list from builtin_games.txt...'), fi,
+    h('span', { class: 'hint' }, ARC.builtinCount() + ' built-in names known')));
+}
+function renderChecks() { const p = $('#checksPane'); if (p) fillChecks(p); }
+function codePane() {
+  const pane = h('div', { class: 'pane' });
+  const ta = h('textarea', { id: 'codeTa', readonly: true, spellcheck: 'false' });
+  ta.value = lastBuild ? lastBuild.src : '';
+  pane.append(h('div', { class: 'row2' }, h('button', { class: 'btn small', onclick: () => { ta.select(); try { document.execCommand('copy'); } catch (e) { } } }, 'Copy'),
+    h('button', { class: 'btn small', onclick: exportArcl }, 'Download .arcl'),
+    h('span', { class: 'hint' }, 'Generated ARCL. Compile it yourself with tools/make_carts.py if you like.')), ta);
+  return pane;
+}
+function renderCode() { const ta = $('#codeTa'); if (ta && lastBuild) ta.value = lastBuild.src; }
+function helpPane() {
+  return h('div', { class: 'pane help' },
+    h('h4', {}, 'How it works'),
+    h('p', {}, 'Drag blocks from the left into the big area and snap them under a yellow event block. Drop a value block (round or hexagon) into a white slot. Drag a block back onto the left list to delete it, or right-click it. Ctrl+Z undoes.'),
+    h('p', {}, 'Scripts run every frame (30 times a second). "every frame" scripts run top to bottom, so put movement above drawing. Sprites you mark "shown on stage" are drawn automatically after your scripts.'),
+    h('p', {}, 'Wait blocks: directly in a script they pause only that script. In "when game starts" they pause the whole game (intro screens).'),
+    h('p', {}, 'Keys in the preview: arrows = D-pad, Z = A, X = B, Enter = pause/resume (Start), Shift = pause too (Select). Start and Select belong to the pause menu on the real device, so blocks cannot read them.'),
+    h('h4', {}, 'Limits'),
+    h('p', {}, 'Cart under 14,000 bytes; code 8 KB; 64 sprites of 8x8; 128 variables (each sprite that moves uses 2-7); 30,000 VM steps per frame; text is transparent so the compiler repaints behind numbers when you disable auto-clear.'),
+    h('h4', {}, 'Getting it on the device'),
+    h('p', {}, 'Download .arc, mount the PyGamer USB drive (Settings > USB drive), copy the file to the /carts folder, eject, press B to reboot. Names and IDs that clash with built-in games are blocked.'));
+}
+
+// ------------------------------------------------------------------ tabs
+const TABS = [['sprites', 'Sprites', spritePane], ['level', 'Level', levelPane], ['project', 'Project', projectPane], ['checks', 'Checks', checksPane], ['code', 'Code', codePane], ['help', 'Help', helpPane]];
+function renderPanes() {
+  const tabs = $('#tabs'); tabs.innerHTML = '';
+  TABS.forEach(([id, name]) => tabs.append(h('button', { class: 'tab' + (curTab === id ? ' on' : ''), onclick: () => { curTab = id; renderPanes(); } }, name, id === 'checks' ? h('span', { id: 'chkBadge', class: 'badge' }) : null)));
+  const host = $('#panes'); host.innerHTML = '';
+  host.append(TABS.find(t => t[0] === curTab)[2]());
+  renderGuard(); renderStatus();
+}
+function renderStatus() {
+  const chip = $('#status');
+  const b = lastBuild;
+  if (!b) { chip.textContent = 'building...'; chip.className = 'chip'; return; }
+  const n = b.errors.length + b.guardErrors.length;
+  chip.textContent = n ? n + ' problem' + (n > 1 ? 's' : '') : (b.warnings.length ? 'OK, ' + b.warnings.length + ' warning(s)' : 'OK • ' + b.stats.bytes + ' bytes');
+  chip.className = 'chip ' + (n ? 'bad' : (b.warnings.length ? 'warn' : 'ok'));
+  const badge = $('#chkBadge'); if (badge) { badge.textContent = n || ''; badge.style.display = n ? 'inline-block' : 'none'; }
+  $('#btnArc').disabled = !!n;
+}
+function renderAll() { renderCats(); renderPalette(); renderWorkspace(); renderPanes(); }
+
+// ------------------------------------------------------------------ files
+function download(name, data, type) {
+  const blob = new Blob([data], { type: type || 'application/octet-stream' });
+  const a = h('a', { href: URL.createObjectURL(blob), download: name });
+  document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function exportArc() {
+  doBuildNow();
+  if (lastBuild.errors.length) { curTab = 'checks'; renderPanes(); alert('Fix the problems first:\n\n' + lastBuild.errors.join('\n')); return; }
+  download(proj.meta.id + '.arc', lastBuild.blob);
+}
+function exportArcl() { doBuildNow(); download(proj.meta.id + '.arcl', lastBuild.src, 'text/plain'); }
+function saveProject() { download((proj.meta.id || 'game') + '.arcgm.json', JSON.stringify(proj, null, 1), 'application/json'); }
+function loadProjectText(text) {
+  let p;
+  try { p = JSON.parse(text); } catch (e) { alert('That file is not valid JSON.'); return; }
+  if (!p || p.format !== 'arcadia-gamemaker') { alert('This is not an Arcadia Game Maker project (.json).'); return; }
+  snapshot();
+  proj = normalize(p);
+  selSprite = 0;
+  renderAll(); changed(); startRun();
+}
+function doBuildNow() { clearTimeout(buildTimer); lastBuild = buildProject(proj); renderStatus(); renderChecks(); renderCode(); renderGuard(); }
+
+// ------------------------------------------------------------------ preview / runtime
+const KEYMAP = { ArrowLeft: 1, ArrowRight: 2, ArrowUp: 4, ArrowDown: 8, z: 16, Z: 16, x: 32, X: 32 };
+const runtime = { vm: null, keys: 0, pad: 0, paused: false, acc: 0, last: 0, err: null, audio: null, muted: false, best: -1, ctx: null, img: null, lut: null };
+function lutInit() {
+  const l = new Uint32Array(65536);
+  for (let v = 0; v < 65536; v++) {
+    const r = (v >> 8) & 0xF8, g = (v >> 3) & 0xFC, b = (v << 3) & 0xF8;
+    l[v] = (255 << 24) | ((b | b >> 5) << 16) | ((g | g >> 6) << 8) | (r | r >> 5);
+  }
+  runtime.lut = l;
+}
+function startRun() {
+  doBuildNow();
+  const ov = $('#overlay');
+  runtime.err = null; ov.style.display = 'none'; runtime.paused = false;
+  if (lastBuild.errors.length) {
+    runtime.vm = null;
+    showMsg('Cannot run yet', lastBuild.errors.slice(0, 4).join('\n'));
+    return;
+  }
+  try {
+    const cart = new Cart(lastBuild.blob);
+    runtime.vm = new VM(cart, { tier: +$('#tier').value, twop: $('#twop').checked, best: runtime.best, onSound: playSound, seed: (Math.random() * 0xFFFFFFFF) >>> 0 });
+    runtime.vm.frame(0);
+  } catch (e) { runtime.vm = null; showMsg('Cart fault', e.message); }
+  drawScreen();
+}
+function showMsg(head, body) {
+  const ov = $('#overlay');
+  ov.innerHTML = '';
+  ov.append(h('div', { class: 'ovh' }, head), h('pre', {}, body));
+  ov.style.display = 'flex';
+}
+function stepOnce() {
+  const vm = runtime.vm;
+  if (!vm || vm.over || runtime.paused) return;
+  const keys = runtime.keys | runtime.pad;
+  try { vm.frame(keys); }
+  catch (e) {
+    if (e instanceof CartError) { runtime.vm = null; showMsg('Cart fault (the device would stop here)', e.message + '\n\nSteps in the last good frame: ' + vm.lastOps); return; }
+    throw e;
+  }
+  if (vm.over) {
+    runtime.best = Math.max(runtime.best, vm.scoreV);
+    const ov = $('#overlay');
+    ov.innerHTML = '';
+    ov.append(h('div', { class: 'ovh' }, vm.overHead || 'GAME OVER'), h('div', {}, 'Score ' + vm.scoreV + (runtime.best >= 0 ? '   Best ' + runtime.best : '')), h('div', { class: 'hint' }, 'Press Z or click Restart'));
+    ov.style.display = 'flex';
+  }
+}
+function drawScreen() {
+  const vm = runtime.vm, cv = $('#screen');
+  if (!runtime.ctx) { runtime.ctx = cv.getContext('2d'); runtime.img = runtime.ctx.createImageData(160, 128); runtime.px = new Uint32Array(runtime.img.data.buffer); lutInit(); }
+  if (vm) {
+    const px = runtime.px, fb = vm.fb, lut = runtime.lut;
+    for (let i = 0; i < fb.length; i++) px[i] = lut[fb[i]];
+    runtime.ctx.putImageData(runtime.img, 0, 0);
+    for (const p of vm.particles) { runtime.ctx.fillStyle = css565(p.c); runtime.ctx.fillRect(Math.round(p.x), Math.round(p.y), 2, 2); }
+    cv.style.transform = vm.shakeMs > 0 ? 'translate(' + ((Math.random() * 2 - 1) * (vm.shakePow || 2) * 2).toFixed(1) + 'px,' + ((Math.random() * 2 - 1) * (vm.shakePow || 2) * 2).toFixed(1) + 'px)' : '';
+  } else {
+    runtime.ctx.fillStyle = '#111'; runtime.ctx.fillRect(0, 0, 160, 128);
+  }
+}
+function tick(now) {
+  requestAnimationFrame(tick);
+  const dt = Math.min(100, now - (runtime.last || now));
+  runtime.last = now;
+  runtime.acc += dt;
+  let n = 0;
+  while (runtime.acc >= 1000 / 30 && n < 3) { runtime.acc -= 1000 / 30; n++; stepOnce(); }
+  if (runtime.acc > 200) runtime.acc = 0;
+  if (n) {
+    drawScreen();
+    const vm = runtime.vm;
+    $('#score').textContent = vm ? vm.scoreV : '-';
+    if (vm) {
+      $('#ops').textContent = vm.lastOps + ' steps (max ' + vm.maxOps + ') of ' + R.BUDGET;
+      const f = $('#opsbar'); f.style.width = Math.min(100, vm.maxOps * 100 / R.BUDGET) + '%'; f.className = vm.maxOps > R.BUDGET * 0.6 ? 'hot' : '';
+    }
+  }
+}
+function audio() {
+  if (runtime.audio || runtime.muted) return runtime.audio;
+  try { runtime.audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { runtime.audio = null; }
+  return runtime.audio;
+}
+function beep(f, ms, t0, type, vol) {
+  const a = audio(); if (!a || runtime.muted || f <= 0) return;
+  try {
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type || 'square'; o.frequency.value = f;
+    const t = a.currentTime + (t0 || 0);
+    g.gain.setValueAtTime(vol || 0.05, t); g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.03, ms / 1000));
+    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + Math.max(0.04, ms / 1000) + 0.02);
+  } catch (e) { }
+}
+const SFX = [[[880, 60]], [[660, 50], [880, 70]], [[523, 90], [659, 90], [784, 90], [1047, 160]], [[200, 80], [140, 120], [90, 200]],
+[[988, 50], [1319, 120]], [[1400, 40], [900, 40], [500, 60]], [[110, 150]], [[330, 50], [520, 50], [740, 70]]];
+function playSound(s) {
+  if (s[0] === 'tone') beep(s[1], Math.min(s[2], 1500));
+  else { const seq = SFX[s[1] & 7]; let t = 0; for (const [f, ms] of seq) { beep(f, ms, t, 'square'); t += ms / 1000; } }
+}
+function editable(el) { return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') && el.type !== 'checkbox'; }
+document.addEventListener('keydown', e => {
+  if (editable(document.activeElement)) return;
+  if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); undo(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  audio();
+  if (e.key in KEYMAP) { runtime.keys |= KEYMAP[e.key]; e.preventDefault(); if ((e.key === 'z' || e.key === 'Z') && runtime.vm && runtime.vm.over) startRun(); }
+  else if (e.key === 'Enter' || e.key === 'Shift') {
+    if (e.repeat) return;
+    if (runtime.vm && !runtime.vm.over) { runtime.paused = !runtime.paused; $('#pauseTag').style.display = runtime.paused ? 'block' : 'none'; }
+    if (e.key === 'Enter') e.preventDefault();
+  }
+});
+document.addEventListener('keyup', e => { if (e.key in KEYMAP) runtime.keys &= ~KEYMAP[e.key]; });
+window.addEventListener('blur', () => { runtime.keys = 0; });
+
+// ------------------------------------------------------------------ init
+function buildChrome() {
+  const sel = $('#tplSel');
+  TEMPLATES.forEach(t => sel.append(h('option', { value: t.id }, t.name)));
+  $('#btnTpl').addEventListener('click', () => {
+    const t = TEMPLATES.find(x => x.id === sel.value);
+    if (!confirm('Start from "' + t.name + '"? Your current project is replaced (Ctrl+Z gets it back; save it first to be safe).')) return;
+    snapshot(); proj = normalize(t.build()); selSprite = 0; renderAll(); cleanUp(true); changed(); startRun();
+  });
+  $('#btnOpen').addEventListener('click', () => $('#fileOpen').click());
+  $('#fileOpen').addEventListener('change', e => { const f = e.target.files[0]; if (f) f.text().then(loadProjectText); e.target.value = ''; });
+  $('#btnSave').addEventListener('click', saveProject);
+  $('#btnArc').addEventListener('click', exportArc);
+  $('#btnArcl').addEventListener('click', exportArcl);
+  $('#btnRun').addEventListener('click', startRun);
+  $('#btnClean').addEventListener('click', () => cleanUp());
+  $('#btnUndo').addEventListener('click', undo);
+  $('#btnPause').addEventListener('click', () => { if (runtime.vm && !runtime.vm.over) { runtime.paused = !runtime.paused; $('#pauseTag').style.display = runtime.paused ? 'block' : 'none'; } });
+  $('#mute').addEventListener('change', e => { runtime.muted = e.target.checked; });
+  $('#tier').addEventListener('change', startRun);
+  $('#twop').addEventListener('change', startRun);
+  $('#overlay').addEventListener('click', () => { if (runtime.vm && runtime.vm.over) startRun(); });
+  // on-screen pad
+  $$('#pad [data-b]').forEach(b => {
+    const bit = +b.dataset.b;
+    const on = e => { runtime.pad |= bit; audio(); e.preventDefault(); };
+    const off = () => { runtime.pad &= ~bit; };
+    b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
+  });
+  // drop a .json project anywhere
+  document.addEventListener('dragover', e => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) e.preventDefault(); });
+  document.addEventListener('drop', e => { const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) { e.preventDefault(); f.text().then(loadProjectText); } });
+  new ResizeObserver(() => { }).observe(document.body);
+}
+function boot() {
+  const bt = store.get('arcadia-gamemaker-builtins');
+  if (bt) ARC.addBuiltinNames(bt.split('\n'));
+  let saved = store.get('arcadia-gamemaker-project');
+  try { proj = saved ? normalize(JSON.parse(saved)) : null; } catch (e) { proj = null; }
+  let fresh = false;
+  if (!proj || !proj.scripts.length) { proj = normalize(TEMPLATES[1].build()); fresh = true; }
+  buildChrome();
+  renderAll();
+  if (fresh) cleanUp(true);
+  doBuildNow();
+  startRun();
+  requestAnimationFrame(tick);
+  window.__gm = { get proj() { return proj; }, get build() { return lastBuild; }, runtime, startRun, loadProjectText, TEMPLATES, normalize, setProj(p) { proj = normalize(p); renderAll(); doBuildNow(); startRun(); } };
+}
+boot();
+})();
+
+</script>
+</body>
+</html>

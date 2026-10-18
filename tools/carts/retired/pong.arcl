@@ -1,0 +1,109 @@
+// RALLY PONG - beat the CPU paddle. Up/Down moves. Score = returns + 10 per CPU miss.
+@name "RALLY PONG"
+@blurb "Arcade: outlast the CPU"
+@author "Arcadia"
+@version 1
+@color cyan
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "Up/Down: move paddle" "Return every ball and" "outlast it. 3 lives"
+@icon "........"
+      ".#....#."
+      ".#....#."
+      ".#..##.."
+      ".#..##.."
+      ".#....#."
+      ".#....#."
+      "........"
+
+const PH = 24;
+const PW = 4;
+array cpuSpd[4] = {2, 1, 3, 4};      // CPU paddle speed per tier (px/frame)
+array ballSpd[4] = {28, 22, 34, 42}; // ball speed per tier (1/16 px per frame)
+
+var py = 52, cy = 52, bx, by, bvx, bvy, lives = 3, rally, hold, flash, spd;
+
+func serve(dir) {
+  bx = 80 * 16;
+  by = (30 + rnd(70)) * 16;
+  bvx = dir * ballSpd[tier()];
+  bvy = rnd(25) - 12;
+  hold = 36;
+  rally = 0;
+}
+
+func init() {
+  serve(1);
+}
+
+func bounce(paddleY, dir) {
+  var off = (by >> 4) - (paddleY + PH / 2);
+  bvx = -bvx;
+  if (bvx > 0 && bvx < 70) bvx += 2;
+  if (bvx < 0 && bvx > -70) bvx -= 2;
+  bvy = off * 2 + rnd(5) - 2;
+  bvy = clamp(bvy, -40, 40);
+  rally++;
+  addscore(1);
+  flash = 4;
+  tone(dir > 0 ? 520 : 400, 25);
+}
+
+func frame() {
+  // --- input
+  if (btn(UP))   py -= 3;
+  if (btn(DOWN)) py += 3;
+  py = clamp(py, 2, SH - PH - 2);
+
+  // --- CPU paddle
+  var cc = cy + PH / 2;
+  var tgt = by >> 4;
+  if (bvx < 0) tgt = 64;          // ball going away: drift to centre
+  if (cc < tgt - 3) cy += cpuSpd[tier()];
+  if (cc > tgt + 3) cy -= cpuSpd[tier()];
+  cy = clamp(cy, 2, SH - PH - 2);
+
+  // --- ball
+  if (hold > 0) {
+    hold--;
+  } else {
+    bx += bvx;
+    by += bvy;
+    var px = bx >> 4;
+    var pyy = by >> 4;
+    if (pyy < 3)       { by = 3 * 16;        bvy = -bvy; sfx(0); }
+    if (pyy > SH - 4)  { by = (SH - 4) * 16; bvy = -bvy; sfx(0); }
+    if (bvx < 0 && px <= 6 + PW && px >= 2 && pyy >= py - 2 && pyy <= py + PH + 2) {
+      bx = (6 + PW + 1) * 16;
+      bounce(py, 1);
+    }
+    if (bvx > 0 && px >= SW - 6 - PW - 2 && px <= SW - 2 && pyy >= cy - 2 && pyy <= cy + PH + 2) {
+      bx = (SW - 6 - PW - 3) * 16;
+      bounce(cy, -1);
+    }
+    if (px < -2) {
+      lives--;
+      sfx(3); shake(150, 2); led(255, 0, 0, 120);
+      if (lives <= 0) { gameover("GAME OVER"); return 0; }
+      serve(1);
+    }
+    if (px > SW + 2) {
+      addscore(10);
+      sfx(2); burst(150, by >> 4, 10, YELLOW);
+      serve(-1);
+    }
+  }
+
+  // --- draw
+  cls(NAVY);
+  for (var y = 0; y < SH; y += 8) rect(79, y, 2, 4, DKGRAY);
+  rect(6, py, PW, PH, WHITE);
+  rect(SW - 6 - PW, cy, PW, PH, ORANGE);
+  var bc = WHITE;
+  if (flash > 0) { flash--; bc = YELLOW; }
+  rect((bx >> 4) - 1, (by >> 4) - 1, 4, 4, bc);
+  numw(60, 3, WHITE, getscore(), 3);
+  for (var i = 0; i < lives; i++) rect(100 + i * 8, 4, 5, 5, RED);
+  if (rally > 4) { text(4, SH - 10, YELLOW, "RALLY"); num(40, SH - 10, YELLOW, rally); }
+  if (hold > 0 && (hold & 8)) ctext(60, WHITE, "GET READY");
+}

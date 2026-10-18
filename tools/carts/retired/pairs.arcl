@@ -1,0 +1,200 @@
+// PAIRS : memory match. Flip two cards; keep matching before your moves run out.
+//   Score = 20 per pair + a time bonus - 3 per wrong flip. Tiers change the card count.
+@name "PAIRS"
+@blurb "Puzzle: match the cards"
+@author "Arcadia"
+@version 1
+@color pink
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: move cursor" "A: flip a card" "Match all pairs fast"
+@icon "###..###"
+      "#.#..#.#"
+      "###..###"
+      "........"
+      "..####.."
+      ".#.##.#."
+      ".######."
+      "..#..#.."
+@sprite s0 "...##..."
+           "..####.."
+           ".######."
+           "########"
+           "########"
+           ".######."
+           "..####.."
+           "...##..."
+@sprite s1 "...##..."
+           "...##..."
+           "########"
+           "########"
+           "...##..."
+           "...##..."
+           "...##..."
+           "...##..."
+@sprite s2 "#......#"
+           "##....##"
+           "########"
+           "########"
+           ".######."
+           "..####.."
+           "..####.."
+           "..#..#.."
+@sprite s3 "..####.."
+           ".######."
+           "###..###"
+           "###..###"
+           ".######."
+           "..####.."
+           ".##..##."
+           "##....##"
+@sprite s4 "....#..."
+           "...###.."
+           "..#####."
+           ".#######"
+           "..#####."
+           "...###.."
+           "....#..."
+           "........"
+@sprite s5 "##..##.."
+           "####.##."
+           "#######."
+           ".######."
+           "..####.."
+           "...##..."
+           "...#...."
+           "........"
+@sprite s6 ".#.##.#."
+           "########"
+           ".######."
+           "########"
+           ".######."
+           "########"
+           ".#.##.#."
+           "........"
+@sprite s7 "#.#.#.#."
+           ".#####.."
+           "#######."
+           ".#####.."
+           "#.#.#.#."
+           "..###..."
+           "...#...."
+           "........"
+@sprite s8 "..####.."
+           ".#....#."
+           "#.####.#"
+           "#.#..#.#"
+           "#.####.#"
+           "#......#"
+           ".#....#."
+           "..####.."
+@sprite s9 "...#...."
+           "..###..."
+           ".#####.."
+           "#######."
+           "..###..."
+           "..###..."
+           ".#####.."
+           "........"
+@sprite s10 ".##..##."
+            "########"
+            "########"
+            ".######."
+            "..####.."
+            "...##..."
+            "........"
+            "........"
+@sprite s11 "########"
+            "#......#"
+            "#.####.#"
+            "#.#..#.#"
+            "#.####.#"
+            "#......#"
+            "########"
+            "........"
+
+array card[24];            // symbol index
+array state[24];           // 0 face down, 1 face up, 2 matched
+array dims[4] = {4, 3, 5, 6};     // columns per tier (rows are always 4)
+array symCol[12] = {2, 8, 5, 12, 6, 4, 7, 11, 1, 3, 13, 15};
+
+var cols, ncards, cur, first, second, wait, matched, moves, miss, t, flash, done, ox, oy, cw;
+
+func init() {
+  cols = dims[tier()];
+  ncards = cols * 4;
+  cw = 160 / cols;
+  if (cw > 30) cw = 30;
+  ox = (160 - cols * cw) / 2;
+  oy = 18;
+  var pairs = ncards / 2;
+  for (var i = 0; i < ncards; i++) { card[i] = i / 2; state[i] = 0; }
+  for (var i = ncards - 1; i > 0; i--) {         // shuffle
+    var j = rnd(i + 1);
+    var tmp = card[i]; card[i] = card[j]; card[j] = tmp;
+  }
+  first = -1; second = -1; cur = 0;
+}
+
+func frame() {
+  t++;
+  if (wait > 0) {
+    wait--;
+    if (wait == 0) {
+      if (card[first] == card[second]) {
+        state[first] = 2; state[second] = 2; matched++;
+        addscore(20); sfx(2); burst(ox + (first % cols) * cw + cw / 2, oy + (first / cols) * 24 + 12, 10, YELLOW);
+        if (matched * 2 == ncards) {
+          var bonus = 300 - t / 8 - miss * 3;
+          if (bonus < 0) bonus = 0;
+          addscore(bonus);
+          gameover("ALL MATCHED!");
+          return 0;
+        }
+      } else {
+        state[first] = 0; state[second] = 0;
+        miss++; addscore(-3);
+        if (getscore() < 0) score(0);
+        sfx(6);
+      }
+      first = -1; second = -1;
+    }
+  } else {
+    if (btnp(LEFT))  cur = (cur % cols == 0) ? cur + cols - 1 : cur - 1;
+    if (btnp(RIGHT)) cur = (cur % cols == cols - 1) ? cur - cols + 1 : cur + 1;
+    if (btnp(UP))    cur = (cur < cols) ? cur + ncards - cols : cur - cols;
+    if (btnp(DOWN))  cur = (cur >= ncards - cols) ? cur % cols : cur + cols;
+    if (btnp(A) && state[cur] == 0) {
+      state[cur] = 1;
+      sfx(1);
+      if (first < 0) first = cur;
+      else { second = cur; wait = 24; moves++; }
+    }
+  }
+  flash++;
+
+  cls(NAVY);
+  for (var i = 0; i < ncards; i++) {
+    var x = ox + (i % cols) * cw;
+    var y = oy + (i / cols) * 24;
+    if (state[i] == 2) {
+      box(x + 2, y + 2, cw - 4, 20, DKGRAY);
+      spr(x + (cw - 8) / 2, y + 8, card[i], DKGRAY);
+    } else if (state[i] == 1) {
+      rect(x + 2, y + 2, cw - 4, 20, WHITE);
+      sprf(x + (cw - 16) / 2, y + 4, card[i], symCol[card[i]], 4);
+    } else {
+      rect(x + 2, y + 2, cw - 4, 20, PURPLE);
+      box(x + 4, y + 4, cw - 8, 16, MAGENTA);
+      if (((x + y + t / 3) & 15) == 0) pix(x + 6, y + 6, WHITE);
+    }
+  }
+  var cx = ox + (cur % cols) * cw;
+  var cy = oy + (cur / cols) * 24;
+  box(cx, cy, cw, 24, (flash & 8) ? YELLOW : ORANGE);
+  box(cx + 1, cy + 1, cw - 2, 22, (flash & 8) ? YELLOW : ORANGE);
+  text(2, 3, WHITE, "SCORE");
+  num(38, 3, YELLOW, getscore());
+  text(86, 3, WHITE, "MOVES");
+  num(122, 3, CYAN, moves);
+}

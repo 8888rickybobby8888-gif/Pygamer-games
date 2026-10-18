@@ -1,0 +1,138 @@
+// LIFE LAB : Conway's cellular automaton as a score game. Place a few cells, press B, watch them live (or die).
+@name "LIFE LAB"
+@blurb "Puzzle: breed a colony"
+@author "Arcadia"
+@version 1
+@color lime
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "A: place/remove a cell" "B: run 100 generations" "Big colonies score more"
+@icon "........"
+      "..#....."
+      "...#...."
+      ".###...."
+      "........"
+      "....##.."
+      "....##.."
+      "........"
+@sprite cell "........"
+             ".######."
+             ".######."
+             ".######."
+             ".######."
+             ".######."
+             ".######."
+             "........"
+
+array budT[4] = {6, 9, 5, 4};
+array a[280];
+array b[280];
+array own[280];
+array hist[4];
+var cx = 9, cy = 6, st, round, placed, gen, tick, chunk, cnt, peak, stable, endT, rs, mt, flash, fast;
+
+func clearField() {
+  memfill(a, 280, 0); memfill(own, 280, 0);
+  placed = 0; gen = 0; peak = 0; stable = 0; st = 0; tick = 0; chunk = 0; cnt = 0;
+  for (var i = 0; i < 4; i++) hist[i] = -1;
+}
+
+func init() {
+  setpal(0, LIME);
+  clearField();
+}
+
+func stepChunk() {
+  var r0 = 1 + chunk * 4;
+  if (chunk < 3) for (var r = r0; r < r0 + 4; r++) {
+    for (var c = 1; c < 19; c++) {
+      var i = r * 20 + c;
+      var n = a[i - 21] + a[i - 20] + a[i - 19] + a[i - 1] + a[i + 1] + a[i + 19] + a[i + 20] + a[i + 21];
+      var v = (n == 3 || (a[i] && n == 2)) ? 1 : 0;
+      b[i] = v; cnt += v;
+    }
+  }
+  chunk++;
+  if (chunk >= 4) {
+    for (var k = 21; k < 259; k++) a[k] = b[k];
+    chunk = 0; gen++;
+    if (cnt > peak) peak = cnt;
+    if (cnt == hist[1]) stable++; else stable = 0;
+    hist[3] = hist[2]; hist[2] = hist[1]; hist[1] = hist[0]; hist[0] = cnt;
+    var pc = cnt;
+    cnt = 0;
+    if (gen % 4 == 0) tone(200 + pc * 3, 10);
+    if (pc == 0 || gen >= 100 || stable >= 14) endRound(pc);
+  }
+}
+
+func endRound(pc) {
+  rs = peak * 2 + pc * 3 + gen / 4;
+  if (pc == 0) { rs = peak * 2; sfx(6); } else { sfx(2); burst(80, 70, 14, LIME); }
+  addscore(rs);
+  st = 3; endT = 0; led(0, 255, 0, 200);
+  hist[0] = pc;
+}
+
+func frame() {
+  flash++;
+  if (st == 0) {
+    mt++;
+    if (mt >= 3) {
+      if (btn(LEFT)) { cx--; mt = 0; } else if (btn(RIGHT)) { cx++; mt = 0; }
+      else if (btn(UP)) { cy--; mt = 0; } else if (btn(DOWN)) { cy++; mt = 0; }
+      cx = clamp(cx, 1, 18); cy = clamp(cy, 1, 12);
+    }
+    var i = cy * 20 + cx;
+    if (btnp(A)) {
+      if (own[i]) { own[i] = 0; a[i] = 0; placed--; tone(200, 8); }
+      else if (placed < budT[tier()]) { own[i] = 1; a[i] = 1; placed++; sfx(0); }
+      else sfx(6);
+    }
+    if (btnp(B) && placed > 0) { st = 1; sfx(5); }
+  } else if (st == 1) {
+    fast = btn(A);
+    tick++;
+    if (chunk > 0 || fast || tick >= 2) { stepChunk(); tick = 0; }
+    if (btnp(B)) endRound(hist[0] < 0 ? cnt : hist[0]);
+  } else {
+    endT++;
+    if (endT > 20 && btnp(A) || endT > 150) {
+      round++;
+      if (round >= 6) { gameover("LAB CLOSED"); return 0; }
+      clearField();
+    }
+  }
+  cls(rgb(10, 14, 30));
+  for (var x = 8; x < 152; x += 8) rect(x, 24, 1, 96, rgb(24, 30, 55));
+  for (var y = 24; y < 112; y += 8) rect(8, y, 144, 1, rgb(24, 30, 55));
+  rect(0, 16, 160, 8, rgb(40, 20, 20)); rect(0, 120, 160, 8, rgb(40, 20, 20)); rect(0, 16, 8, 112, rgb(40, 20, 20)); rect(152, 16, 8, 112, rgb(40, 20, 20));
+  drawmap(a, 20, 14, 0, 16);
+  if (st == 0) {
+    for (var k = 21; k < 259; k++) if (own[k]) rect((k % 20) * 8 + 1, 16 + (k / 20) * 8 + 1, 6, 6, CYAN);
+    box(cx * 8, 16 + cy * 8, 8, 8, (flash & 4) ? WHITE : YELLOW);
+  }
+  rect(0, 0, 160, 15, NAVY);
+  text(2, 1, WHITE, "ROUND");
+  num(36, 1, YELLOW, round + 1);
+  text(46, 1, WHITE, "/6");
+  text(2, 8, WHITE, "SCORE");
+  numw(34, 8, CYAN, getscore(), 4);
+  if (st == 0) {
+    text(68, 1, WHITE, "CELLS");
+    num(100, 1, LIME, budT[tier()] - placed);
+    text(68, 8, GRAY, "B: RUN");
+  } else {
+    text(68, 1, WHITE, "GEN");
+    numw(86, 1, YELLOW, gen, 3);
+    text(68, 8, WHITE, "PEAK");
+    numw(92, 8, LIME, peak, 3);
+    text(122, 1, WHITE, "POP");
+    numw(140, 1, LIME, hist[0] < 0 ? 0 : hist[0], 3);
+  }
+  if (st == 3) {
+    ctext(52, YELLOW, "ROUND SCORE");
+    numw(64, 64, WHITE, rs, 4);
+    if (hist[0] == 0) ctext(78, RED, "DIED OUT");
+  }
+}

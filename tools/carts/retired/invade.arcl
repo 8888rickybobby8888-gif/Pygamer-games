@@ -1,0 +1,214 @@
+// STAR INVADERS : 8x4 alien fleet, cannon, bombs, mystery UFO, faster every wave.
+@name "STAR INVADERS"
+@blurb "Arcade: repel the fleet"
+@author "Arcadia"
+@version 1
+@color green
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "Left/Right: move cannon" "A: fire (hold = auto)" "Clear waves, 3 lives"
+@icon "..#..#.."
+      "...##..."
+      "..####.."
+      ".##..##."
+      "########"
+      "#.####.#"
+      "#.#..#.#"
+      "...##..."
+@sprite alienA1 "..#..#.."
+                "...##..."
+                "..####.."
+                ".##..##."
+                "########"
+                "#.####.#"
+                "#.#..#.#"
+                "...##..."
+@sprite alienA2 "..#..#.."
+                "#..##..#"
+                "#.####.#"
+                "###..###"
+                "########"
+                ".######."
+                "..#..#.."
+                ".#....#."
+@sprite alienB1 "...##..."
+                "..####.."
+                ".######."
+                "##.##.##"
+                "########"
+                "..#..#.."
+                ".#.##.#."
+                "#.#..#.#"
+@sprite alienB2 "...##..."
+                "..####.."
+                ".######."
+                "##.##.##"
+                "########"
+                ".#.##.#."
+                "#......#"
+                ".#....#."
+@sprite cannon  "...##..."
+                "...##..."
+                ".######."
+                "########"
+                "########"
+                "########"
+                "........"
+                "........"
+@sprite ufo     "..####.."
+                ".######."
+                "########"
+                "##.##.##"
+                "########"
+                ".#.##.#."
+                "........"
+                "........"
+
+const COLS = 8;
+const ROWS = 4;
+array alive[32];
+array bombX[4];
+array bombY[4];
+array stepDelay[4] = {20, 26, 14, 9};
+
+var fx, fy, fdir, fstep, ftick, nAlive, px, bx, by, lives, wave, cool, anim, ux, udir, uT, flash, deadT, edge;
+
+func newWave() {
+  memfill(alive, 32, 1);
+  nAlive = 32;
+  fx = 8; fy = 18 + (wave > 3 ? 12 : wave * 4); fdir = 1; ftick = 0; anim = 0;
+  by = -1;
+  for (var i = 0; i < 4; i++) bombY[i] = -1;
+  fstep = stepDelay[tier()] - wave;
+  if (fstep < 3) fstep = 3;
+}
+
+func init() {
+  lives = 3; wave = 0; px = 76; ux = -20; udir = 0; uT = 400;
+  newWave();
+}
+
+func alienX(c) { return fx + c * 16; }
+func alienY(r) { return fy + r * 12; }
+
+func hurt() {
+  lives--;
+  sfx(3); shake(250, 3); led(255, 0, 0, 200);
+  burst(px + 4, 116, 16, ORANGE);
+  deadT = 30;
+  for (var i = 0; i < 4; i++) bombY[i] = -1;
+  if (lives <= 0) gameover("INVADED!");
+}
+
+func frame() {
+  if (deadT > 0) {
+    deadT--;
+  } else {
+    // --- player
+    if (btn(LEFT))  px -= 2;
+    if (btn(RIGHT)) px += 2;
+    px = clamp(px, 2, 150);
+    if (cool > 0) cool--;
+    if (btn(A) && by < 0 && cool == 0) { bx = px + 3; by = 112; cool = 8; sfx(5); }
+    // --- bullet
+    if (by >= 0) {
+      by -= 5;
+      var hitIt = 0;
+      if (by < 14) hitIt = 1;
+      for (var r = 0; r < ROWS && !hitIt; r++) {
+        for (var c = 0; c < COLS; c++) {
+          if (alive[r * COLS + c] && hit(bx, by, 2, 4, alienX(c), alienY(r), 8, 8)) {
+            alive[r * COLS + c] = 0;
+            nAlive--;
+            addscore(10 * (4 - r) + 10);
+            sfx(0); burst(alienX(c) + 4, alienY(r) + 4, 8, r < 2 ? CYAN : LIME);
+            hitIt = 1;
+            break;
+          }
+        }
+      }
+      if (uT < 0 && hit(bx, by, 2, 4, ux, 14, 8, 8)) {
+        addscore(100); sfx(2); burst(ux + 4, 18, 14, YELLOW); uT = 500 + rnd(300); udir = 0; hitIt = 1;
+      }
+      if (hitIt) by = -1;
+    }
+    // --- fleet march
+    ftick++;
+    var spd = fstep - (32 - nAlive) / 6;
+    if (spd < 2) spd = 2;
+    if (ftick >= spd) {
+      ftick = 0;
+      anim = 1 - anim;
+      fx += fdir * 4;
+      edge = 0;
+      for (var c = 0; c < COLS; c++) {
+        for (var r = 0; r < ROWS; r++) {
+          if (alive[r * COLS + c]) {
+            var x = alienX(c);
+            if (x < 3 || x > 148) edge = 1;
+          }
+        }
+      }
+      if (edge) { fdir = -fdir; fx += fdir * 4; fy += 6; sfx(6); }
+      else sfx(6);
+      // random bomb from the lowest alien of a random column
+      if (rnd(100) < 40 + wave * 6) {
+        var c2 = rnd(COLS);
+        for (var r = ROWS - 1; r >= 0; r--) {
+          if (alive[r * COLS + c2]) {
+            for (var i = 0; i < 4; i++) {
+              if (bombY[i] < 0) { bombX[i] = alienX(c2) + 3; bombY[i] = alienY(r) + 8; break; }
+            }
+            break;
+          }
+        }
+      }
+    }
+    // --- bombs
+    for (var i = 0; i < 4; i++) {
+      if (bombY[i] >= 0) {
+        bombY[i] += 2 + wave / 3;
+        if (hit(bombX[i], bombY[i], 2, 5, px, 112, 8, 8)) { bombY[i] = -1; hurt(); }
+        else if (bombY[i] > 126) bombY[i] = -1;
+      }
+    }
+    // --- UFO
+    uT--;
+    if (uT == 0) { udir = rnd(2) ? 1 : -1; ux = udir > 0 ? -10 : 162; uT = -1; sfx(7); }
+    if (uT < 0) {
+      ux += udir;
+      if (ux < -12 || ux > 164) { uT = 400 + rnd(400); }
+    }
+    // landed?
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        if (alive[r * COLS + c] && alienY(r) > 104) { lives = 0; gameover("THEY LANDED!"); }
+      }
+    }
+    if (nAlive == 0) { wave++; addscore(50); sfx(2); newWave(); }
+  }
+  flash++;
+
+  // --- draw
+  cls(BLACK);
+  for (var i = 0; i < 20; i++) pix((i * 37 + wave * 11) % 160, (i * 23) % 100 + 14, DKGRAY);
+  for (var r = 0; r < ROWS; r++) {
+    for (var c = 0; c < COLS; c++) {
+      if (alive[r * COLS + c]) {
+        var col = r == 0 ? PINK : (r == 1 ? CYAN : (r == 2 ? LIME : YELLOW));
+        if (r < 2) spr(alienX(c), alienY(r), anim ? alienB2 : alienB1, col);
+        else spr(alienX(c), alienY(r), anim ? alienA2 : alienA1, col);
+      }
+    }
+  }
+  if (uT < 0) spr(ux, 14, ufo, RED);
+  if (deadT == 0 || (deadT & 4)) spr(px, 112, cannon, GREEN);
+  if (by >= 0) rect(bx, by, 2, 4, WHITE);
+  for (var i = 0; i < 4; i++) if (bombY[i] >= 0) rect(bombX[i], bombY[i], 2, 5, (flash & 2) ? ORANGE : RED);
+  rect(0, 122, 160, 1, GREEN);
+  text(2, 2, WHITE, "SCORE");
+  num(38, 2, YELLOW, getscore());
+  text(100, 2, WHITE, "WAVE");
+  num(130, 2, CYAN, wave + 1);
+  for (var i = 0; i < lives; i++) spr(2 + i * 10, 118, cannon, GREEN);
+}

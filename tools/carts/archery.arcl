@@ -1,0 +1,110 @@
+// ARCHERY : 10 arrows. Hold B to steady your aim, read the wind, press A to loose. Targets get smaller.
+@name "ARCHERY"
+@blurb "Reflex: read the wind"
+@author "Arcadia"
+@version 1
+@color yellow
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: aim  B: steady" "Aim against the wind" "A: loose the arrow"
+@icon "........"
+      "..####.."
+      ".#....#."
+      "#..##..#"
+      "#.####.#"
+      "#..##..#"
+      ".#....#."
+      "..####.."
+
+array swT[4] = {10, 6, 14, 18};
+array windT[4] = {6, 3, 9, 12};
+array hx[10];
+array hy[10];
+array col[5] = {WHITE, DKGRAY, BLUE, RED, YELLOW};
+var aimx = 80, aimy = 70, t, n, st, ft, breath = 90, wind, ix, iy, ring, sx, sy, pt, shown, rw, flash, streak;
+
+func newwind() {
+  var w = windT[tier()];
+  wind = rnd(2 * w + 1) - w;
+}
+
+func init() {
+  newwind();
+  rw = 5;
+}
+
+func frame() {
+  t++;
+  flash++;
+  if (n >= 4) rw = 4;
+  if (n >= 7) rw = 3;
+  if (st == 0) {
+    if (btn(LEFT)) aimx -= 2;
+    if (btn(RIGHT)) aimx += 2;
+    if (btn(UP)) aimy -= 2;
+    if (btn(DOWN)) aimy += 2;
+    aimx = clamp(aimx, 20, 140); aimy = clamp(aimy, 24, 124);
+    var amp = swT[tier()] * (4 + n / 3) / 4;
+    if (btn(B) && breath > 0) { breath -= 1; amp = amp / 4; }
+    else { breath = min(breath + (btn(B) ? 0 : 1), 90); if (btn(B)) amp = amp * 2; }
+    sx = (sin((t * 3) & 255) * amp + sin((t * 7 + 40) & 255) * amp / 2) / 127;
+    sy = (cos((t * 4) & 255) * amp + cos((t * 9) & 255) * amp / 2) / 127;
+    if (btnp(A)) {
+      ix = aimx + sx + wind;
+      iy = aimy + sy;
+      st = 1; ft = 0; sfx(5);
+    }
+  } else if (st == 1) {
+    ft++;
+    if (ft >= 9) {
+      var dx = ix - 80; var dy = iy - 70;
+      var d = sqrt(dx * dx + dy * dy);
+      ring = max(0, 10 - d / rw);
+      if (d >= 10 * rw) ring = 0;
+      hx[n] = ix; hy[n] = iy;
+      addscore(ring);
+      n++;
+      st = 2; ft = 0; pt = 40;
+      if (ring >= 9) { sfx(2); burst(ix, iy, 14, YELLOW); led(255, 200, 0, 200); }
+      else if (ring > 0) { sfx(4); burst(ix, iy, 6, WHITE); }
+      else { sfx(6); }
+      if (ring == 10) { streak++; shake(100, 1); } else streak = 0;
+    }
+  } else {
+    pt--;
+    if (pt <= 0) {
+      if (n >= 10) { gameover("ROUND DONE"); return 0; }
+      newwind();
+      st = 0;
+    }
+  }
+  cls(rgb(40, 120, 50));
+  for (var r = 10; r >= 1; r--) disc(80, 70, r * rw, col[4 - (r - 1) / 2]);
+  circ(80, 70, 10 * rw, BLACK);
+  for (var i = 0; i < n; i++) { disc(hx[i], hy[i], 2, ORANGE); pix(hx[i], hy[i], WHITE); }
+  if (st == 0) {
+    var cx = aimx + sx; var cy = aimy + sy;
+    circ(cx, cy, 6, RED);
+    line(cx - 9, cy, cx + 9, cy, RED);
+    line(cx, cy - 9, cx, cy + 9, RED);
+  } else if (st == 1) {
+    var fx = 80 + (ix - 80) * ft / 9;
+    var fy = 128 + (iy - 128) * ft / 9;
+    line(fx, fy, fx + (80 - fx) / 8, fy + 12, WHITE);
+    disc(fx, fy, 1, ORANGE);
+  } else if (pt > 8) {
+    num(ix + 6, iy - 10 - (40 - pt) / 3, YELLOW, ring);
+  }
+  rect(0, 0, 160, 15, NAVY);
+  text(2, 1, WHITE, "ARROW");
+  num(34, 1, YELLOW, min(n + (st == 0 ? 1 : 0), 10));
+  text(46, 1, WHITE, "/10");
+  text(2, 8, WHITE, "SCORE");
+  numw(34, 8, CYAN, getscore(), 3);
+  text(80, 1, WHITE, "WIND");
+  if (wind > 0) text(108, 1, ORANGE, ">>>"); else if (wind < 0) text(108, 1, ORANGE, "<<<");
+  numw(128, 1, ORANGE, abs(wind), 2);
+  box(80, 8, 62, 5, WHITE);
+  rect(81, 9, breath * 60 / 90, 3, breath < 25 ? RED : LIME);
+  if (ring == 10 && st == 2 && (flash & 4)) ctext(110, YELLOW, "BULLSEYE");
+}

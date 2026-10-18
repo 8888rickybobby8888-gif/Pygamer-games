@@ -1,0 +1,172 @@
+// HOPPER : cross the road, ride the logs, fill all five homes. Frogger-lite.
+@name "HOPPER"
+@blurb "Arcade: cross the road"
+@author "Arcadia"
+@version 1
+@color green
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: hop one square" "Dodge cars, ride logs" "Fill the 5 homes on top"
+@icon "#.####.#"
+      "########"
+      ".#.##.#."
+      "..####.."
+      ".######."
+      ".#.##.#."
+      "##....##"
+      "#......#"
+@sprite frog "#.####.#"
+             "########"
+             ".#.##.#."
+             "..####.."
+             ".######."
+             ".#.##.#."
+             "##....##"
+             "#......#"
+@sprite car  "........"
+             ".######."
+             "########"
+             "#.####.#"
+             "########"
+             "########"
+             ".#....#."
+             "........"
+
+// lanes 0..10 from the bottom; 0 start, 1-4 road, 5 median, 6-9 river, 10 homes
+array spd[11];        // signed speed in 1/16 px per frame
+array wd[11];         // object width (px)
+array per[11];        // spacing between objects (px)
+array off[11];        // scroll phase in 1/16 px
+array home[5];
+array speedBase[4] = {1, 0, 2, 3};
+
+var fx, fl, lives, level, tleft, deadT, flash, mult;
+
+func setupLanes() {
+  var m = 16 + level * 3 + speedBase[tier()] * 4;
+  spd[1] = -m;      wd[1] = 14; per[1] = 56;
+  spd[2] = m * 3 / 4; wd[2] = 22; per[2] = 70;
+  spd[3] = -m * 5 / 4; wd[3] = 14; per[3] = 48;
+  spd[4] = m;       wd[4] = 30; per[4] = 90;
+  spd[6] = m / 2;   wd[6] = 40; per[6] = 84;
+  spd[7] = -m / 2 - 4; wd[7] = 28; per[7] = 70;
+  spd[8] = m * 3 / 4; wd[8] = 48; per[8] = 96;
+  spd[9] = -m / 3 - 4; wd[9] = 34; per[9] = 76;
+  for (var i = 1; i < 10; i++) off[i] = rnd(1000) * 16;
+}
+
+func respawn() {
+  fx = 76; fl = 0; tleft = 900; deadT = 0;
+}
+
+func init() {
+  lives = 3; level = 0;
+  setupLanes();
+  respawn();
+}
+
+func die() {
+  if (deadT > 0) return;
+  lives--;
+  deadT = 40;
+  sfx(3); shake(200, 2); led(255, 0, 0, 150);
+  burst(fx + 4, 24 + (10 - fl) * 8 + 4, 12, GREEN);
+  if (lives <= 0) gameover("SPLAT!");
+}
+
+func phase(i) {
+  var p = (off[i] / 16) % per[i];
+  if (p < 0) p += per[i];
+  return p;
+}
+
+// is horizontal point x covered by an object of lane i ?
+func covered(i, x) {
+  var d = (x - phase(i)) % per[i];
+  if (d < 0) d += per[i];
+  return d < wd[i];
+}
+
+func frame() {
+  if (deadT > 0) {
+    deadT--;
+    if (deadT == 0 && lives > 0) respawn();
+  } else {
+    if (btnp(UP) && fl < 10)  { fl++; sfx(7); addscore(1); }
+    if (btnp(DOWN) && fl > 0) { fl--; sfx(7); }
+    if (btnp(LEFT))  { fx -= 8; sfx(7); }
+    if (btnp(RIGHT)) { fx += 8; sfx(7); }
+    if (fx < 0) fx = 0;
+    if (fx > 152) fx = 152;
+    tleft--;
+    if (tleft <= 0) die();
+  }
+  for (var i = 1; i < 10; i++) off[i] += spd[i];
+  if (deadT == 0) {
+    var cx = fx + 4;
+    if (fl >= 1 && fl <= 4) {
+      if (covered(fl, cx - 2) || covered(fl, cx + 2)) die();
+    } else if (fl >= 6 && fl <= 9) {
+      if (covered(fl, cx)) {
+        fx += spd[fl] / 16;
+        if (fx < -2 || fx > 154) die();
+      } else die();
+    } else if (fl == 10) {
+      var slot = (cx - 12) / 28;
+      var inSlot = cx >= 12 && cx < 12 + 5 * 28 && (cx - 12) % 28 < 18;
+      if (inSlot && slot >= 0 && slot < 5 && home[slot] == 0) {
+        home[slot] = 1;
+        addscore(50 + tleft / 20);
+        sfx(2); burst(cx, 28, 12, YELLOW);
+        var all = 1;
+        for (var k = 0; k < 5; k++) if (home[k] == 0) all = 0;
+        if (all) {
+          memfill(home, 5, 0);
+          level++; addscore(100);
+          setupLanes();
+        }
+        respawn();
+      } else die();
+    }
+  }
+  flash++;
+
+  cls(BLACK);
+  // lanes
+  for (var i = 0; i <= 10; i++) {
+    var y = 24 + (10 - i) * 8;
+    if (i == 0 || i == 5) rect(0, y, 160, 8, PURPLE);
+    else if (i >= 1 && i <= 4) { rect(0, y, 160, 8, DKGRAY); rect(0, y + 7, 160, 1, GRAY); }
+    else if (i >= 6 && i <= 9) rect(0, y, 160, 8, NAVY);
+    else rect(0, y, 160, 8, DKGRAY);
+  }
+  // homes
+  rect(0, 24, 160, 8, GREEN);
+  for (var k = 0; k < 5; k++) {
+    rect(12 + k * 28, 24, 18, 8, BLACK);
+    if (home[k]) spr(12 + k * 28 + 5, 24, frog, LIME);
+  }
+  for (var i = 1; i < 10; i++) {
+    if (i == 5) continue;
+    var y = 24 + (10 - i) * 8;
+    var p = phase(i);
+    for (var x = p - per[i]; x < 160; x += per[i]) {
+      if (i <= 4) {
+        var cwid = wd[i];
+        rect(x, y + 1, cwid, 6, (i & 1) ? RED : ORANGE);
+        rect(x + (spd[i] > 0 ? cwid - 4 : 1), y + 2, 3, 4, CYAN);
+      } else {
+        rect(x, y + 1, wd[i], 6, BROWN);
+        rect(x, y + 3, wd[i], 1, ORANGE);
+      }
+    }
+  }
+  if (deadT == 0 || (deadT & 4)) spr(fx, 24 + (10 - fl) * 8, frog, deadT ? RED : LIME);
+  // HUD
+  text(2, 3, WHITE, "SCORE");
+  num(38, 3, YELLOW, getscore());
+  for (var i = 0; i < lives; i++) spr(110 + i * 9, 2, frog, LIME);
+  rect(0, 118, tleft * 160 / 900, 4, tleft < 200 ? RED : GREEN);
+  text(2, 108, WHITE, "LV");
+  num(18, 108, CYAN, level + 1);
+}

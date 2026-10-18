@@ -1,0 +1,200 @@
+// BOWLING : 10 frames. Pick your spot, aim, time the power, and curve the ball with Up/Down while it rolls.
+@name "BOWLING"
+@blurb "Reflex: strike them all"
+@author "Arcadia"
+@version 1
+@color orange
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "Up/Down: spot, curve" "A: lock aim, then power" "Strikes & spares score"
+@icon "...##..."
+      "..#..#.."
+      "..#..#.."
+      "..####.."
+      "........"
+      ".##.##.#"
+      "#..#..##"
+      "........"
+
+array metT[4] = {5, 3, 7, 9};
+array radT[4] = {7, 9, 6, 6};
+array rl[24];
+array ppx[10];
+array ppy[10];
+array pvx[10];
+array pvy[10];
+array pst[10];
+var st, f, bn, nr, tm, bx, by, bvx, bvy, spot = 62, av, pw, pdir = 1, left, before, flash, msgT, msg, tot, hook;
+
+func rack() {
+  var k = 0;
+  for (var r = 0; r < 4; r++)
+    for (var j = 0; j <= r; j++) {
+      ppx[k] = (120 + r * 8) * 16; ppy[k] = (62 + (2 * j - r) * 9 / 2) * 16;
+      pvx[k] = 0; pvy[k] = 0; pst[k] = 0; k++;
+    }
+}
+
+func standing() {
+  var c = 0;
+  for (var i = 0; i < 10; i++) if (pst[i] == 0) c++;
+  return c;
+}
+
+func total() {
+  var i = 0; var s = 0;
+  for (var fr = 0; fr < 10; fr++) {
+    if (i >= nr) break;
+    if (rl[i] == 10) { s += 10 + rl[i + 1] + rl[i + 2]; i++; }
+    else { s += rl[i] + rl[i + 1]; if (rl[i] + rl[i + 1] == 10) s += rl[i + 2]; i += 2; }
+  }
+  return s;
+}
+
+func init() {
+  rack();
+  bx = 16 * 16; by = spot * 16;
+}
+
+func endRoll() {
+  var k = before - standing();
+  rl[nr] = k; nr++;
+  var strike = (k == 10 && (bn == 0 || f == 9));
+  var spare = (bn > 0 && (k == left));
+  left = standing();
+  msg = 0;
+  if (strike) { msg = 1; sfx(2); led(255, 200, 0, 300); shake(300, 3); }
+  else if (spare) { msg = 2; sfx(4); }
+  else if (k == 0) { msg = 3; sfx(6); }
+  msgT = 50;
+  tot = total(); score(tot);
+  // advance
+  if (f < 9) {
+    if (strike || bn == 1) { f++; bn = 0; rack(); left = 10; } else bn = 1;
+  } else {
+    // 10th frame: up to 3 balls
+    if (bn == 0) { bn = 1; if (strike) { rack(); left = 10; } }
+    else if (bn == 1) {
+      if (rl[nr - 2] == 10 || rl[nr - 1] + rl[nr - 2] == 10) { bn = 2; if (standing() == 0 || rl[nr - 1] == 10) { rack(); left = 10; } }
+      else bn = 9;
+    } else bn = 9;
+    if (bn == 9) { st = 6; tm = 0; return 0; }
+  }
+  st = 5; tm = 0;
+}
+
+func frame() {
+  tm++; flash++;
+  if (msgT > 0) msgT--;
+  if (st == 0 || st == 1 || st == 2) { bx = 16 * 16; by = spot * 16; }
+  if (st == 0) {
+    if (btn(UP)) spot -= 1;
+    if (btn(DOWN)) spot += 1;
+    spot = clamp(spot, 32, 92);
+    if (btnp(A)) { st = 1; sfx(1); }
+  } else if (st == 1) {
+    av = (sin((tm * metT[tier()] / 2) & 255) * 12) / 127;
+    if (btnp(A)) { st = 2; pw = 0; pdir = 1; sfx(1); }
+  } else if (st == 2) {
+    pw += pdir * metT[tier()];
+    if (pw >= 100) { pw = 100; pdir = -1; }
+    if (pw <= 0) { pw = 0; pdir = 1; }
+    if (btnp(A)) {
+      var sp = 40 + pw * 60 / 100;
+      bvx = cos(av & 255) * sp / 127; bvy = sin(av & 255) * sp / 127;
+      before = standing(); st = 3; sfx(5); tm = 0;
+    }
+  } else if (st == 3) {
+    if (btn(UP)) bvy -= 1;
+    if (btn(DOWN)) bvy += 1;
+    bx += bvx; by += bvy;
+    var gy = by >> 4;
+    if (gy < 25 || gy > 99) { if (gy < 25) by = 21 * 16; else by = 103 * 16; bvy = 0; hook = 1; }
+    else hook = 0;
+    if (!hook) {
+      for (var i = 0; i < 10; i++) {
+        if (pst[i] == 0) {
+          var dx = (ppx[i] - bx) >> 4; var dy = (ppy[i] - by) >> 4;
+          var d2 = dx * dx + dy * dy;
+          if (d2 < radT[tier()] * radT[tier()]) {
+            var d = max(1, sqrt(d2));
+            var kk = (abs(bvx) + abs(bvy)) * 3 / 4 + 8;
+            pvx[i] = dx * kk / d; pvy[i] = dy * kk / d; pst[i] = 1;
+            bvx = bvx * 14 / 16; bvy -= dy * 2;
+            tone(300 + rnd(200), 12); burst(ppx[i] >> 4, ppy[i] >> 4, 3, WHITE);
+          }
+        }
+      }
+    }
+    if ((bx >> 4) > 156 || abs(bvx) < 10) { st = 4; tm = 0; }
+  } else if (st == 4) {
+    if (tm > 70) endRoll();
+  } else if (st == 5) {
+    if (tm > 30 && btnp(A) || tm > 110) { st = 0; if (bn == 0) spot = 62; }
+  } else if (st == 6) {
+    if (btnp(A) && tm > 20) { gameover("GAME OVER"); return 0; }
+    if (tm > 110) { gameover("GAME OVER"); return 0; }
+  }
+  // pin physics (always)
+  for (var i = 0; i < 10; i++) {
+    if (pst[i] == 1) {
+      ppx[i] += pvx[i]; ppy[i] += pvy[i];
+      pvx[i] = pvx[i] * 7 / 8; pvy[i] = pvy[i] * 7 / 8;
+      var ax = ppx[i] >> 4; var ay = ppy[i] >> 4;
+      if (abs(pvx[i]) + abs(pvy[i]) < 7 || ay < 25 || ay > 99 || ax > 156) pst[i] = 2;
+      else {
+        for (var j = 0; j < 10; j++) {
+          if (pst[j] == 0) {
+            var dx = (ppx[j] - ppx[i]) >> 4; var dy = (ppy[j] - ppy[i]) >> 4;
+            var d2 = dx * dx + dy * dy;
+            if (d2 < 41) {
+              var d = max(1, sqrt(d2));
+              var kk = (abs(pvx[i]) + abs(pvy[i])) * 4 / 5;
+              pvx[j] = dx * kk / d; pvy[j] = dy * kk / d; pst[j] = 1;
+              pvx[i] = pvx[i] / 2; pvy[i] = pvy[i] / 2;
+              tone(500, 6);
+            }
+          }
+        }
+      }
+    }
+  }
+  cls(rgb(25, 25, 40));
+  rect(0, 24, 160, 77, rgb(200, 150, 80));
+  for (var y = 28; y < 100; y += 12) rect(0, y, 160, 1, rgb(180, 130, 65));
+  rect(0, 18, 160, 6, DKGRAY); rect(0, 101, 160, 6, DKGRAY);
+  rect(34, 24, 2, 77, RED);
+  for (var i = 0; i < 10; i++) {
+    if (pst[i] != 2) {
+      disc(ppx[i] >> 4, ppy[i] >> 4, 3, WHITE);
+      rect((ppx[i] >> 4) - 2, (ppy[i] >> 4) - 1, 4, 1, RED);
+    }
+  }
+  if (st <= 2) {
+    var ax = bx >> 4;
+    var ex = ax + cos(av & 255) * 60 / 127; var ey = (by >> 4) + sin(av & 255) * 60 / 127;
+    if (st >= 1) line(ax, by >> 4, ex, ey, st == 1 ? YELLOW : RED);
+  }
+  disc(bx >> 4, by >> 4, 4, NAVY);
+  pix((bx >> 4) - 1, (by >> 4) - 1, CYAN);
+  rect(0, 0, 160, 16, NAVY);
+  text(2, 1, WHITE, "FRAME");
+  num(36, 1, YELLOW, f + 1);
+  text(52, 1, WHITE, "BALL");
+  num(78, 1, YELLOW, bn + 1);
+  text(100, 1, WHITE, "SCORE");
+  numw(132, 1, CYAN, tot, 3);
+  text(2, 9, GRAY, "PINS");
+  num(28, 9, WHITE, standing());
+  rect(0, 108, 160, 20, NAVY);
+  if (st == 0) ctext(114, WHITE, "UP/DOWN: SPOT   A: OK");
+  if (st == 1) ctext(114, YELLOW, "A: LOCK AIM");
+  if (st == 2) {
+    box(30, 112, 100, 8, WHITE);
+    rect(31, 113, pw * 98 / 100, 6, pw > 85 ? RED : LIME);
+    text(30, 121, GRAY, "POWER");
+  }
+  if (st == 3) ctext(114, GRAY, "UP/DOWN: CURVE");
+  if (msgT > 0 && (flash & 2)) ctext(60, YELLOW, msg == 1 ? "STRIKE!" : (msg == 2 ? "SPARE!" : (msg == 3 ? "MISS" : "")));
+  if (st == 6) ctext(60, WHITE, "FINAL SCORE");
+}

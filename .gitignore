@@ -1,0 +1,7 @@
+# backups and build output
+*.bak
+*.bak-*
+build/
+__pycache__/
+*.tmp
+node_modules/

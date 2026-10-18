@@ -1,0 +1,126 @@
+// ZAP ZAP : whack the critters before they hide. 30 seconds. Don't touch the bombs!
+@name "ZAP ZAP"
+@blurb "Reflex: whack & dodge"
+@author "Arcadia"
+@version 1
+@color magenta
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: move the mallet" "A: whack (gold = x3)" "Avoid the bombs!"
+@icon "........"
+      ".##..##."
+      "#..##..#"
+      "#.#..#.#"
+      ".######."
+      ".#.##.#."
+      "..####.."
+      "#......#"
+@sprite critter "..#..#.."
+                ".######."
+                "##.##.##"
+                "########"
+                "########"
+                ".#.##.#."
+                "..####.."
+                "........"
+@sprite bomb    "......#."
+                ".....#.."
+                "..####.."
+                ".######."
+                "########"
+                "########"
+                ".######."
+                "..####.."
+@sprite mallet  "..####.."
+                ".######."
+                ".######."
+                "..####.."
+                "...##..."
+                "...##..."
+                "...##..."
+                "...##..."
+
+array hole[9];               // 0 empty, 1 critter, 2 bomb, 3 gold critter
+array life[9];
+array hitT[9];
+array popRate[4] = {26, 40, 18, 12};
+
+var cur, tleft, tick, spawnT, flash, combo, misses, fx;
+
+func init() {
+  cur = 4;
+  tleft = 30 * 30;
+  spawnT = 20;
+}
+
+func frame() {
+  tick++;
+  tleft--;
+  if (tleft <= 0) { gameover("TIME!"); return 0; }
+  if (btnp(LEFT)  && cur % 3 > 0) cur--;
+  if (btnp(RIGHT) && cur % 3 < 2) cur++;
+  if (btnp(UP)    && cur >= 3) cur -= 3;
+  if (btnp(DOWN)  && cur < 6) cur += 3;
+  spawnT--;
+  if (spawnT <= 0) {
+    var h = rnd(9);
+    if (hole[h] == 0) {
+      var r = rnd(100);
+      hole[h] = 1;
+      if (r < 18) hole[h] = 2;
+      else if (r < 26) hole[h] = 3;
+      life[h] = 40 + rnd(30) - (30 - tleft / 30) * 1;
+      if (life[h] < 14) life[h] = 14;
+    }
+    spawnT = popRate[tier()] - (30 - tleft / 30) / 2 + rnd(8);
+    if (spawnT < 6) spawnT = 6;
+  }
+  for (var i = 0; i < 9; i++) {
+    if (hole[i]) {
+      life[i]--;
+      if (life[i] <= 0) {
+        if (hole[i] != 2) { combo = 0; misses++; }
+        hole[i] = 0;
+      }
+    }
+    if (hitT[i] > 0) hitT[i]--;
+  }
+  if (btnp(A)) {
+    hitT[cur] = 6;
+    var k = hole[cur];
+    if (k == 1 || k == 3) {
+      combo++;
+      var pts = (k == 3 ? 30 : 10) + (combo > 4 ? combo : 0);
+      addscore(pts); sfx(0); burst((cur % 3) * 44 + 34, (cur / 3) * 34 + 38, 8, k == 3 ? YELLOW : LIME);
+      hole[cur] = 0;
+    } else if (k == 2) {
+      addscore(-20); if (getscore() < 0) score(0);
+      combo = 0; sfx(3); shake(200, 3); led(255, 40, 0, 150);
+      burst((cur % 3) * 44 + 34, (cur / 3) * 34 + 38, 14, ORANGE);
+      tleft -= 60;
+      hole[cur] = 0;
+    } else { sfx(6); combo = 0; }
+  }
+  flash++;
+
+  cls(BROWN);
+  rect(0, 0, 160, 16, DKGRAY);
+  for (var i = 0; i < 9; i++) {
+    var x = (i % 3) * 44 + 12;
+    var y = (i / 3) * 34 + 24;
+    disc(x + 22, y + 14, 15, BLACK);
+    if (hole[i] == 1) spr(x + 14, y - 2 + (life[i] < 8 ? 8 - life[i] : 0), critter, LIME);
+    if (hole[i] == 2) spr(x + 14, y - 2, bomb, (flash & 4) ? RED : GRAY);
+    if (hole[i] == 3) spr(x + 14, y - 2, critter, YELLOW);
+    rect(x + 4, y + 14, 36, 3, BROWN);
+  }
+  var mx = (cur % 3) * 44 + 26;
+  var my = (cur / 3) * 34 + 14;
+  sprf(mx, my + (hitT[cur] > 0 ? 6 : 0), mallet, WHITE, hitT[cur] > 0 ? 6 : 4);
+  text(2, 4, WHITE, "SCORE");
+  num(38, 4, YELLOW, getscore());
+  rect(80, 5, tleft * 70 / 900, 6, tleft < 250 ? RED : GREEN);
+  box(79, 4, 72, 8, GRAY);
+  if (combo > 2) text(2, 118, YELLOW, "COMBO");
+  if (combo > 2) num(38, 118, WHITE, combo);
+}

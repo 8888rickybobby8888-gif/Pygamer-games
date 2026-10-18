@@ -1,0 +1,130 @@
+// FISHING : lower your hook, wait for a bite, then keep the fish inside the reel zone with A. Beat the clock.
+@name "FISHING"
+@blurb "Reflex: reel them in"
+@author "Arcadia"
+@version 1
+@color blue
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: move the hook" "Touch a fish: it bites" "Hold A: raise the zone"
+@icon "..#....."
+      "..#....."
+      "..#....."
+      "..#..##."
+      "..#.####"
+      "#.#..##."
+      ".##....."
+      "..#....."
+
+array chT[4] = {30, 38, 24, 20};
+array secT[4] = {70, 90, 60, 50};
+array typR[4] = {3, 4, 5, 7};
+array typP[4] = {10, 25, 50, 100};
+array typS[4] = {9, 15, 21, 27};
+array typC[4] = {CYAN, GREEN, ORANGE, GRAY};
+array fx[8];
+array fy[8];
+array fdr[8];
+array fty[8];
+array fcd[8];
+var hx = 80, hy = 40, st, tleft, cp, cv, tp, fp, tgt, tt, prog, cur, ch, flash, msgT, msgP, gold, lost;
+
+func respawn(i) {
+  fdr[i] = rnd(2) ? 1 : -1;
+  fx[i] = fdr[i] > 0 ? -8 : 168;
+  var row = i & 3;
+  fy[i] = 42 + row * 21 + rnd(7);
+  fty[i] = row;
+  if (row == 3 && tier() == 1) fty[i] = 2;
+  if (row == 3 && rnd(3) == 0) fty[i] = 2;
+  if (row == 0 && rnd(3) == 0) fty[i] = 1;
+  fcd[i] = 0;
+}
+
+func init() {
+  tleft = secT[tier()] * 30;
+  ch = chT[tier()];
+  for (var i = 0; i < 8; i++) { respawn(i); fx[i] = rnd(160); }
+}
+
+func frame() {
+  flash++;
+  tleft--;
+  if (tleft <= 0) { gameover("TIME UP"); return 0; }
+  if (msgT > 0) msgT--;
+  if (st == 0) {
+    if (btn(LEFT)) hx -= 2;
+    if (btn(RIGHT)) hx += 2;
+    if (btn(UP)) hy -= 2;
+    if (btn(DOWN)) hy += 2;
+    hx = clamp(hx, 8, 150); hy = clamp(hy, 26, 122);
+  }
+  for (var i = 0; i < 8; i++) {
+    if (fcd[i] > 0) fcd[i]--;
+    if (!(st == 1 && cur == i)) {
+      fx[i] += fdr[i] * (1 + (typS[fty[i]] / 8));
+      if (fx[i] < -10 || fx[i] > 170) respawn(i);
+    }
+    if (st == 0 && fcd[i] == 0 && abs(hx - fx[i]) < 7 && abs(hy - fy[i]) < 6) {
+      st = 1; cur = i; cp = 80 * 8; cv = 0; fp = 60 * 8; tgt = fp; tt = 0; prog = 90;
+      sfx(0); tone(900, 40); led(0, 120, 255, 150);
+    }
+  }
+  if (st == 1) {
+    tt--;
+    if (tt <= 0) { tgt = (10 + rnd(100 - 10)) * 8; tt = 18 + rnd(22); }
+    var sp = typS[fty[cur]];
+    if (fp < tgt) fp = min(fp + sp, tgt); else fp = max(fp - sp, tgt);
+    cv += btn(A) ? -3 : 2;
+    cv = clamp(cv, -36, 36);
+    cp += cv;
+    if (cp < 0) { cp = 0; cv = 0; }
+    if (cp > (100 - ch) * 8) { cp = (100 - ch) * 8; cv = 0; }
+    var inside = fp >= cp && fp <= cp + ch * 8;
+    prog += inside ? 4 : -3;
+    if (prog >= 300) {
+      var pts = typP[fty[cur]];
+      addscore(pts);
+      msgP = pts; msgT = 45; sfx(2);
+      burst(hx, hy, 14, YELLOW); shake(120, 1);
+      tleft += 60;
+      respawn(cur); st = 0; hy = 40;
+    } else if (prog <= 0) {
+      sfx(6); lost = 20;
+      fcd[cur] = 50; fdr[cur] = -fdr[cur]; st = 0;
+    }
+  }
+  if (lost > 0) lost--;
+  cls(rgb(120, 190, 255));
+  rect(0, 22, 160, 106, rgb(20, 90, 170));
+  rect(0, 62, 160, 66, rgb(15, 70, 140));
+  rect(0, 94, 160, 34, rgb(10, 50, 110));
+  for (var x = 0; x < 160; x += 16) rect(x + ((flash >> 2) & 7), 22, 8, 1, WHITE);
+  var bx = hx;
+  rect(bx - 10, 14, 20, 6, BROWN); rect(bx - 6, 8, 3, 6, WHITE);
+  line(bx + 2, 12, bx + 2, hy, WHITE);
+  disc(hx, hy, 2, RED);
+  for (var i = 0; i < 8; i++) {
+    var r = typR[fty[i]];
+    disc(fx[i], fy[i], r, typC[fty[i]]);
+    line(fx[i] - fdr[i] * r, fy[i], fx[i] - fdr[i] * (r + 4), fy[i] - 3, typC[fty[i]]);
+    line(fx[i] - fdr[i] * r, fy[i], fx[i] - fdr[i] * (r + 4), fy[i] + 3, typC[fty[i]]);
+    pix(fx[i] + fdr[i] * (r - 2), fy[i] - 1, BLACK);
+  }
+  if (st == 1) {
+    rect(118, 24, 26, 100, BLACK);
+    box(118, 24, 26, 100, WHITE);
+    rect(120, 24 + cp / 8, 22, ch, rgb(60, 220, 80));
+    disc(131, 24 + fp / 8, typR[fty[cur]], typC[fty[cur]]);
+    rect(148, 24, 6, 100, DKGRAY);
+    rect(148, 124 - prog * 100 / 300, 6, prog * 100 / 300, prog < 90 ? RED : YELLOW);
+    if (prog < 90 && (flash & 4)) ctext(100, RED, "LOSING IT");
+  }
+  rect(0, 0, 160, 7, NAVY);
+  text(2, 0, WHITE, "SCORE");
+  numw(34, 0, YELLOW, getscore(), 4);
+  text(80, 0, WHITE, "TIME");
+  numw(108, 0, tleft < 300 ? RED : CYAN, tleft / 30, 3);
+  if (msgT > 0) { text(hx - 10, hy - 14 - (45 - msgT) / 4, YELLOW, "+"); num(hx - 4, hy - 14 - (45 - msgT) / 4, YELLOW, msgP); }
+  if (lost > 0) ctext(60, WHITE, "GOT AWAY");
+}

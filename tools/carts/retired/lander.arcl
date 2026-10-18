@@ -1,0 +1,138 @@
+// MOON LANDER : thrust against gravity and touch down gently on the striped pad.
+@name "MOON LANDER"
+@blurb "Arcade: land softly"
+@author "Arcadia"
+@version 1
+@color gray
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "A/Up: main thruster" "Left/Right: side jets" "Land slow, on the pad"
+@icon "...##..."
+      "..####.."
+      "..#..#.."
+      ".######."
+      "#.#..#.#"
+      "........"
+      "...##..."
+      "########"
+@sprite lander "...##..."
+               "..####.."
+               ".######."
+               ".######."
+               "..####.."
+               ".#.##.#."
+               "#..##..#"
+               "#......#"
+
+array hgt[41];                 // terrain height (y of the surface) per 4 px column edge
+array fuelStart[4] = {900, 1300, 650, 450};
+
+var x16, y16, vx, vy, fuel, level, pad, thr, flash, deadT, doneT, msgT, gravity;
+
+func makeTerrain() {
+  var h = 90 + rnd(20);
+  pad = 4 + rnd(30);
+  for (var i = 0; i <= 40; i++) {
+    h += rnd(9) - 4;
+    if (level > 1) h += rnd(7) - 3;
+    h = clamp(h, 70, 120);
+    hgt[i] = h;
+  }
+  var ph = hgt[pad];
+  for (var i = pad; i <= pad + 4 && i <= 40; i++) hgt[i] = ph;
+}
+
+func newLevel() {
+  makeTerrain();
+  x16 = (10 + rnd(30)) * 16;
+  y16 = 28 * 16;
+  vx = 6 + rnd(10); vy = 0;
+  if (rnd(2)) vx = -vx;
+  gravity = 1;
+  fuel += fuelStart[tier()] / 2;
+  if (fuel > fuelStart[tier()]) fuel = fuelStart[tier()];
+  doneT = 0;
+}
+
+func init() {
+  fuel = fuelStart[tier()];
+  newLevel();
+}
+
+func surface(x) {
+  var i = clamp(x / 4, 0, 39);
+  var f = x - i * 4;
+  return hgt[i] + (hgt[i + 1] - hgt[i]) * f / 4;
+}
+
+func crash() {
+  sfx(3); shake(300, 4); led(255, 60, 0, 250);
+  burst(x16 / 16 + 4, y16 / 16 + 4, 22, ORANGE);
+  gameover("CRASHED!");
+}
+
+func frame() {
+  thr = 0;
+  if (doneT > 0) {
+    doneT--;
+    if (doneT == 0) { level++; newLevel(); }
+  } else {
+    // physics (units: 1/16 px, velocities in 1/64 px per frame -> /4)
+    if (fuel > 0) {
+      if (btn(A) || btn(UP)) { vy -= 2; fuel -= 3; thr = 1; }
+      if (btn(LEFT))  { vx -= 1; fuel -= 1; thr = 2; }
+      if (btn(RIGHT)) { vx += 1; fuel -= 1; thr = 3; }
+      if (fuel < 0) fuel = 0;
+    }
+    if ((frames() & 1) == 0) vy += gravity;
+    x16 += vx / 2;
+    y16 += vy / 2;
+    var px = x16 / 16;
+    var feet = y16 / 16 + 8;
+    if (px < -4 || px > 156) { crash(); }
+    var cx = px + 4;
+    var ground = surface(clamp(cx, 0, 159));
+    if (feet >= ground) {
+      var onPad = cx >= pad * 4 + 2 && cx <= (pad + 4) * 4 - 2;
+      if (onPad && abs(vx) < 12 && vy < 22) {
+        var bonus = 50 + fuel / 10 + level * 25;
+        addscore(bonus);
+        sfx(2); burst(cx, ground - 2, 12, YELLOW);
+        doneT = 70; msgT = 70;
+        vx = 0; vy = 0;
+        y16 = (ground - 8) * 16;
+      } else crash();
+    }
+  }
+  flash++;
+
+  cls(BLACK);
+  for (var i = 0; i < 18; i++) pix((i * 53) % 160, (i * 29) % 70 + 14, (i & 1) ? WHITE : GRAY);
+  // terrain
+  for (var i = 0; i < 40; i++) {
+    var a = hgt[i];
+    var b = hgt[i + 1];
+    var col = DKGRAY;
+    rect(i * 4, (a < b ? a : b), 4, 128 - (a < b ? a : b), DKGRAY);
+    line(i * 4, a, i * 4 + 4, b, GRAY);
+  }
+  // pad
+  rect(pad * 4, hgt[pad] - 1, 16, 2, (flash & 8) ? YELLOW : ORANGE);
+  rect(pad * 4, hgt[pad] - 4, 2, 4, YELLOW);
+  rect(pad * 4 + 14, hgt[pad] - 4, 2, 4, YELLOW);
+  if (doneT == 0 || (doneT & 4) == 0) spr(x16 / 16, y16 / 16, lander, WHITE);
+  if (thr == 1 && fuel > 0) { rect(x16 / 16 + 3, y16 / 16 + 8, 2, 4 + (flash & 3), ORANGE); }
+  if (thr == 2) rect(x16 / 16 + 8, y16 / 16 + 3, 3, 2, YELLOW);
+  if (thr == 3) rect(x16 / 16 - 3, y16 / 16 + 3, 3, 2, YELLOW);
+  // HUD
+  text(2, 2, WHITE, "SCORE");
+  num(38, 2, YELLOW, getscore());
+  text(2, 11, WHITE, "FUEL");
+  rect(32, 11, fuel * 40 / fuelStart[tier()], 6, fuel < 150 ? RED : GREEN);
+  box(31, 10, 42, 8, GRAY);
+  text(84, 2, WHITE, "VX");
+  num(100, 2, abs(vx) < 12 ? GREEN : RED, vx);
+  text(84, 11, WHITE, "VY");
+  num(100, 11, vy < 22 ? GREEN : RED, vy);
+  if (msgT > 0) { msgT--; ctext(60, YELLOW, "TOUCHDOWN!"); }
+}

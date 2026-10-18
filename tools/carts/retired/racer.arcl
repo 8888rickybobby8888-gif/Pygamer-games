@@ -1,0 +1,151 @@
+// TURBO RACER : pseudo-3D road racing. Pass traffic, grab time, keep it on the asphalt.
+//   Up/A = gas, Down = brake, B = nitro (limited), Left/Right = steer.
+@name "TURBO RACER"
+@blurb "Race: beat the clock"
+@author "Arcadia"
+@version 1
+@color red
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "Left/Right: steer" "A/Up gas  Down brake" "B: nitro. Pass cars!"
+@icon "...##..."
+      "..#..#.."
+      "..#..#.."
+      ".#....#."
+      ".#.##.#."
+      "#.####.#"
+      "#.####.#"
+      "########"
+@sprite car "..####.."
+            ".#.##.#."
+            ".######."
+            "########"
+            "#.####.#"
+            "########"
+            "##....##"
+            "#......#"
+
+const NC = 5;
+array cz[5];            // distance ahead of the player (0 = off)
+array cx[5];            // lateral position -60..60
+array cs[5];            // car speed
+array cc[5];
+array timeStart[4] = {45, 60, 35, 28};
+
+var px, speed, dist, tleft, nitro, flash, crashT, curve, grass1, grass2, passes, tick, ticks, nextCp, msgT, off, lastBend;
+
+func init() {
+  grass1 = rgb(0, 150, 40);
+  grass2 = rgb(0, 110, 30);
+  tleft = timeStart[tier()] * 30;
+  nitro = 100;
+  speed = 0; px = 0;
+  for (var i = 0; i < NC; i++) cz[i] = 0;
+  nextCp = 3000;
+}
+
+func spawnCar() {
+  for (var i = 0; i < NC; i++) {
+    if (cz[i] == 0) {
+      cz[i] = 200; cx[i] = rnd(100) - 50; cs[i] = 40 + rnd(40) + dist / 400;
+      cc[i] = 2 + rnd(6);
+      return 0;
+    }
+  }
+}
+
+func frame() {
+  tick++;
+  // --- controls
+  var maxs = 150;
+  if (btn(A) || btn(UP)) speed += 3; else speed -= 1;
+  if (btn(DOWN)) speed -= 6;
+  if (btn(B) && nitro > 0 && speed > 60) { speed += 6; maxs = 230; nitro -= 2; flash = 3; }
+  else if (nitro < 100 && tick % 6 == 0) nitro++;
+  if (crashT > 0) { crashT--; speed -= 4; }
+  if (speed < 0) speed = 0;
+  if (speed > maxs) speed -= 4;
+  if (btn(LEFT))  px -= 2 + speed / 60;
+  if (btn(RIGHT)) px += 2 + speed / 60;
+  px = clamp(px, -110, 110);
+  dist += speed / 8;
+  curve = sin(dist / 12) * 3 / 4;
+  px -= curve * speed / 2500;
+  if (abs(px) > 62) {       // on the grass
+    if (speed > 50) speed -= 3;
+    if (tick & 1) shake(60, 1);
+  }
+  if (dist >= 3000) { dist -= 3000; tleft += 20 * 30; msgT = 50; sfx(2); }
+  tleft--;
+  if (tleft <= 0) { gameover("TIME UP"); return 0; }
+  if (tick % 30 == 0) addscore(speed / 20);
+  // --- traffic
+  if (tick % 24 == 0) spawnCar();
+  for (var i = 0; i < NC; i++) {
+    if (cz[i] > 0) {
+      cz[i] -= (speed - cs[i]) / 6;
+      if (cz[i] <= 2) {
+        if (speed > cs[i]) { addscore(20); passes++; sfx(4); }
+        cz[i] = 0;
+      } else if (cz[i] > 260) cz[i] = 0;
+      else if (cz[i] < 14 && abs(cx[i] - px / 2) < 20 && crashT == 0) {
+        crashT = 25; speed = speed / 3; tleft -= 60; sfx(3); shake(250, 3); led(255, 80, 0, 150);
+        burst(80, 108, 14, ORANGE);
+        cz[i] = 0;
+      }
+    }
+  }
+  if (flash > 0) flash--;
+  if (msgT > 0) msgT--;
+  if (tick == 1) tick = 1;
+
+  // --- draw: sky + horizon
+  rect(0, 0, 160, 14, BLACK);   // HUD strip: clear last frame's digits
+  rect(0, 14, 160, 38, NAVY);
+  disc(120, 40, 7, YELLOW);
+  rect(0, 44, 160, 8, PURPLE);
+  var band;
+  for (var i = 0; i < 76; i++) {
+    var y = 52 + i;
+    var z = 2400 / (i + 14);
+    band = ((z + dist / 6) >> 4) & 1;
+    var hw = 5 + i * 10 / 9;
+    var d = 76 - i;
+    var bend = (((d * d) >> 6) * curve) >> 8;
+    var c = 80 + bend - px * i / 90;
+    rect(0, y, 160, 1, band ? grass1 : grass2);
+    rect(c - hw - 3, y, hw * 2 + 6, 1, band ? RED : WHITE);
+    rect(c - hw, y, hw * 2, 1, band ? GRAY : DKGRAY);
+    if (band) rect(c - 1 - i / 40, y, 2 + i / 40, 1, WHITE);
+  }
+  // cars, far to near
+  for (var k = 0; k < NC; k++) {
+    if (cz[k] > 0) {
+      var ii = 2400 / cz[k] - 14;
+      if (ii > 2 && ii < 76) {
+        var d2 = 76 - ii;
+        var hw2 = 5 + ii * 10 / 9;
+        var c2 = 80 + ((((d2 * d2) >> 6) * curve) >> 8) - px * ii / 90;
+        var xx = c2 + cx[k] * hw2 / 64;
+        var sz = 3 + ii / 5;
+        rect(xx - sz / 2, 52 + ii - sz, sz, sz, cc[k]);
+        rect(xx - sz / 2 + 1, 52 + ii - sz + 1, sz - 2, sz / 3, CYAN);
+        rect(xx - sz / 2, 52 + ii - 1, sz, 1, BLACK);
+      }
+    }
+  }
+  // player car
+  var cxp = 80 + (crashT & 4 ? 2 : 0);
+  sprf(cxp - 8, 106, car, flash ? YELLOW : WHITE, 4);
+  if (flash) { rect(cxp - 4, 122, 2, 4, ORANGE); rect(cxp + 2, 122, 2, 4, ORANGE); }
+  // HUD
+  text(2, 2, WHITE, "SCORE");
+  num(38, 2, YELLOW, getscore());
+  text(86, 2, WHITE, "TIME");
+  num(116, 2, tleft < 300 ? RED : GREEN, tleft / 30);
+  text(2, 118, WHITE, "KMH");
+  num(24, 118, CYAN, speed);
+  rect(100, 118, nitro / 3, 5, nitro > 20 ? ORANGE : RED);
+  box(99, 117, 35, 7, GRAY);
+  if (msgT > 0 && (msgT & 8)) ctext(30, YELLOW, "CHECKPOINT +20s");
+}

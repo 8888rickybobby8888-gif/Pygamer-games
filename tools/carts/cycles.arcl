@@ -1,0 +1,141 @@
+// LIGHT CYCLES : Tron duel. Leave a wall behind you, box the CPU in. Each win speeds things up.
+@name "LIGHT CYCLES"
+@blurb "Battle: trap the CPU"
+@author "Arcadia"
+@version 1
+@color cyan
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: turn your cycle" "Crash the CPU instead" "Wins score 100 + length"
+@icon "........"
+      ".######."
+      ".#....#."
+      ".#.##.#."
+      ".#.#..#."
+      ".#.####."
+      ".#......"
+      "........"
+@sprite blk "########"
+            "#......#"
+            "#.####.#"
+            "#.####.#"
+            "#.####.#"
+            "#.####.#"
+            "#......#"
+            "########"
+
+const W = 20;
+const H = 14;
+array stepT[4] = {5, 7, 4, 3};
+array noise[4] = {4, 12, 1, 0};
+array m[280];
+var px, py, pd, cx, cy, cd, want, t, wins, dead, endT, rounds;
+
+func dxf(d) { return d == 0 ? 1 : (d == 2 ? -1 : 0); }
+func dyf(d) { return d == 1 ? 1 : (d == 3 ? -1 : 0); }
+
+func run(x, y, d) {
+  var n = 0;
+  while (n < 9) {
+    x += dxf(d); y += dyf(d);
+    if (mget(m, W, H, x, y) != 0) break;
+    n++;
+  }
+  return n;
+}
+
+func newround() {
+  memfill(m, 280, 0);
+  for (var i = 0; i < W; i++) { mset(m, W, H, i, 0, 193); mset(m, W, H, i, H - 1, 193); }
+  for (var j = 0; j < H; j++) { mset(m, W, H, 0, j, 193); mset(m, W, H, W - 1, j, 193); }
+  for (var k = 0; k < 3 + rounds * 2; k++) {
+    var bx = 5 + rnd(10);
+    var by = 1 + rnd(12);
+    if (by < 8 || by > 6) { if (by != 7) mset(m, W, H, bx, by, 193); }
+  }
+  px = 3; py = 7; pd = 0; want = 0;
+  cx = 16; cy = 7; cd = 2;
+  mset(m, W, H, px, py, 65);
+  mset(m, W, H, cx, cy, 129);
+  mset(m, W, H, 2, 7, 0); mset(m, W, H, 17, 7, 0);
+  t = 0; dead = 0; endT = 0;
+}
+
+func init() {
+  setpal(1, CYAN); setpal(2, ORANGE); setpal(3, GRAY);
+  rounds = 0; wins = 0;
+  newround();
+}
+
+func cpuThink() {
+  var best = -99; var bd = cd;
+  for (var o = -1; o <= 1; o++) {
+    var d = (cd + o + 4) & 3;
+    var s = run(cx, cy, d) * 3 + rnd(noise[tier()] + 1);
+    if (o == 0) s += 2;
+    if (s > best) { best = s; bd = d; }
+  }
+  cd = bd;
+}
+
+func frame() {
+  if (btnp(RIGHT) && pd != 2) want = 1 + 0;
+  if (btnp(DOWN) && pd != 3) want = 2;
+  if (btnp(LEFT) && pd != 0) want = 3;
+  if (btnp(UP) && pd != 1) want = 4;
+  if (dead == 0) {
+    t++;
+    var sp = stepT[tier()] - (rounds > 3 ? 1 : 0);
+    if (sp < 2) sp = 2;
+    if (t >= sp) {
+      t = 0;
+      if (want == 1) pd = 0;
+      if (want == 2) pd = 1;
+      if (want == 3) pd = 2;
+      if (want == 4) pd = 3;
+      want = 0;
+      cpuThink();
+      var nx = px + dxf(pd); var ny = py + dyf(pd);
+      var qx = cx + dxf(cd); var qy = cy + dyf(cd);
+      var pb = mget(m, W, H, nx, ny) != 0;
+      var cb = mget(m, W, H, qx, qy) != 0;
+      if (nx == qx && ny == qy) { pb = 1; cb = 1; }
+      if (pb) dead |= 1;
+      if (cb) dead |= 2;
+      if (!pb) { px = nx; py = ny; mset(m, W, H, px, py, 65); }
+      if (!cb) { cx = qx; cy = qy; mset(m, W, H, cx, cy, 129); }
+      addscore(1);
+      tone(180 + (t & 0) + rounds * 8, 8);
+      if (dead) {
+        endT = 40;
+        shake(250, 3); sfx(3);
+        if (pb) burst(px * 8 + 4, py * 8 + 20, 14, CYAN);
+        if (cb) burst(cx * 8 + 4, cy * 8 + 20, 14, ORANGE);
+        led(dead == 2 ? 0 : 255, dead == 2 ? 255 : 0, 0, 300);
+      }
+    }
+  } else {
+    endT--;
+    if (endT <= 0) {
+      if (dead == 2) {
+        wins++; rounds++; addscore(100); sfx(2);
+        newround();
+      } else if (dead == 3) {
+        newround();
+      } else {
+        gameover("CRASHED");
+        return 0;
+      }
+    }
+  }
+  cls(BLACK);
+  drawmap(m, W, H, 0, 16);
+  rect(px * 8 + 1, py * 8 + 17, 6, 6, WHITE);
+  rect(cx * 8 + 1, cy * 8 + 17, 6, 6, YELLOW);
+  rect(0, 0, 160, 15, NAVY);
+  text(4, 4, WHITE, "WINS");
+  num(34, 4, YELLOW, wins);
+  text(80, 4, WHITE, "SCORE");
+  numw(116, 4, CYAN, getscore(), 5);
+  if (endT > 0 && (endT & 4)) ctext(60, WHITE, dead == 2 ? "YOU WIN" : (dead == 3 ? "DRAW" : "CRASH"));
+}

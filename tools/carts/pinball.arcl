@@ -1,0 +1,134 @@
+// PINBALL : bumpers, slanted guides and two flippers. Keep the ball alive and chain bumper hits.
+@name "PINBALL"
+@blurb "Arcade: flip the ball"
+@author "Arcadia"
+@version 1
+@color magenta
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "Left/A: left flipper" "Right/B: right flipper" "Chain bumper combos"
+@icon "........"
+      "..####.."
+      ".#.##.#."
+      ".#.##.#."
+      ".#....#."
+      ".##..##."
+      "..#..#.."
+      "...##..."
+
+array grav[4] = {4, 3, 5, 6};
+array ballsT[4] = {3, 5, 3, 2};
+array seg[16] = {44, 86, 56, 108, 116, 86, 104, 108, 42, 18, 60, 2, 118, 18, 100, 2};
+array su[20];
+array bumx[3] = {68, 92, 80};
+array bumy[3] = {36, 36, 60};
+array bumf[3];
+var bx, by, vx, vy, fl, fr, st, balls, combo, stall, tm, ft, flash, lastHit;
+
+// ball (bx,by in 1/16 px) against segment at (ax,ay) (1/4 px), unit (ux,uy) scaled 127, length L (1/4 px), radius r (1/4 px)
+func coll(ax, ay, ux, uy, L, r, kick) {
+  var qx = bx >> 2; var qy = by >> 2;
+  var rx = qx - ax; var ry = qy - ay;
+  if (abs(rx) > 100 || abs(ry) > 100) return 0;
+  var pj = (rx * ux + ry * uy) >> 7;
+  pj = clamp(pj, 0, L);
+  var cx = ax + ((ux * pj) >> 7);
+  var cy = ay + ((uy * pj) >> 7);
+  var dx = qx - cx; var dy = qy - cy;
+  var d2 = dx * dx + dy * dy;
+  if (d2 >= r * r) return 0;
+  var d = sqrt(d2);
+  if (d < 1) d = 1;
+  var nx = dx * 127 / d; var ny = dy * 127 / d;
+  bx = (cx + nx * r / 127) * 4; by = (cy + ny * r / 127) * 4;
+  var dot = (fmul(vx, nx) + fmul(vy, ny)) * 2;
+  if (dot < 0) {
+    vx -= fmul(dot * 7 / 5, nx) * 2;
+    vy -= fmul(dot * 7 / 5, ny) * 2;
+  }
+  vx += nx * kick / 127; vy += ny * kick / 127;
+  return 1;
+}
+
+func init() {
+  for (var i = 0; i < 4; i++) {
+    var dx = (seg[i * 4 + 2] - seg[i * 4]) * 4;
+    var dy = (seg[i * 4 + 3] - seg[i * 4 + 1]) * 4;
+    var L = sqrt(dx * dx + dy * dy);
+    su[i * 5] = dx * 127 / L; su[i * 5 + 1] = dy * 127 / L; su[i * 5 + 2] = L;
+  }
+  fl = 21; fr = 21; balls = ballsT[tier()]; st = 0;
+  bx = 80 * 16; by = 10 * 16;
+}
+
+func serve() {
+  st = 0; bx = (70 + rnd(20)) * 16; by = 10 * 16; vx = rnd(41) - 20; vy = 0; combo = 0; stall = 0;
+}
+
+func frame() {
+  tm++;
+  var lb = btn(LEFT) || btn(A);
+  var rb = btn(RIGHT) || btn(B);
+  var olf = fl; var orf = fr;
+  fl = clamp(lb ? fl - 14 : fl + 14, -21, 21);
+  fr = clamp(rb ? fr - 14 : fr + 14, -21, 21);
+  if ((lb && olf == 21) || (rb && orf == 21)) tone(140, 10);
+  if (st == 0) {
+    if (btnp(A) || btnp(B) || btnp(UP)) { st = 1; sfx(5); }
+  } else {
+    vy += grav[tier()];
+    vx = clamp(vx, -200, 200); vy = clamp(vy, -200, 200);
+    vx = vx * 63 / 64; vy = vy * 63 / 64;
+    bx += vx; by += vy;
+    if (bx < 44 * 16) { bx = 44 * 16; vx = abs(vx) * 3 / 4; }
+    if (bx > 116 * 16) { bx = 116 * 16; vx = -abs(vx) * 3 / 4; }
+    if (by < 5 * 16) { by = 5 * 16; vy = abs(vy) * 3 / 4; }
+    for (var i = 0; i < 4; i++) coll(seg[i * 4] * 4, seg[i * 4 + 1] * 4, su[i * 5], su[i * 5 + 1], su[i * 5 + 2], 16, 0);
+    var kl = (lb && fl > -21) ? 70 : 0;
+    var kr = (rb && fr > -21) ? 70 : 0;
+    if (coll(56 * 4, 108 * 4, cos(fl & 255), sin(fl & 255), 80, 20, kl)) { combo = 0; if (kl) sfx(0); }
+    if (coll(104 * 4, 108 * 4, cos((128 - fr) & 255), sin((128 - fr) & 255), 80, 20, kr)) { combo = 0; if (kr) sfx(0); }
+    for (var b = 0; b < 3; b++) {
+      if (coll(bumx[b] * 4, bumy[b] * 4, 127, 0, 0, 40, 24)) {
+        vx += rnd(15) - 7; vy += rnd(9) - 4;
+        combo++;
+        addscore(50 * min(1 + combo / 3, 5));
+        bumf[b] = 6; flash = 6;
+        tone(500 + b * 120, 30);
+        burst(bumx[b], bumy[b], 5, YELLOW);
+        shake(60, 1);
+        stall = 0;
+      }
+      if (bumf[b] > 0) bumf[b]--;
+    }
+    if (abs(vx) + abs(vy) < 10) stall++; else stall = 0;
+    if (stall > 90) { vx = rnd(81) - 40; vy = -40; stall = 0; }
+    if (by > 132 * 16) {
+      balls--;
+      sfx(3); led(255, 0, 0, 200); shake(200, 2);
+      if (balls <= 0) { gameover("GAME OVER"); return 0; }
+      serve();
+    }
+  }
+  cls(rgb(10, 0, 28));
+  rect(0, 0, 42, 128, NAVY); rect(118, 0, 42, 128, NAVY);
+  line(41, 18, 41, 128, CYAN); line(119, 18, 119, 128, CYAN);
+  for (var i = 0; i < 4; i++) line(seg[i * 4], seg[i * 4 + 1], seg[i * 4 + 2], seg[i * 4 + 3], CYAN);
+  line(56, 108, 56 + cos(fl & 255) * 20 / 127, 108 + sin(fl & 255) * 20 / 127, ORANGE);
+  line(56, 109, 56 + cos(fl & 255) * 20 / 127, 109 + sin(fl & 255) * 20 / 127, YELLOW);
+  line(104, 108, 104 + cos((128 - fr) & 255) * 20 / 127, 108 + sin((128 - fr) & 255) * 20 / 127, ORANGE);
+  line(104, 109, 104 + cos((128 - fr) & 255) * 20 / 127, 109 + sin((128 - fr) & 255) * 20 / 127, YELLOW);
+  for (var b = 0; b < 3; b++) {
+    disc(bumx[b], bumy[b], 7, bumf[b] > 0 ? WHITE : RED);
+    circ(bumx[b], bumy[b], 7, YELLOW);
+    disc(bumx[b], bumy[b], 2, bumf[b] > 0 ? RED : YELLOW);
+  }
+  disc((bx >> 4), (by >> 4), 3, WHITE);
+  text(3, 4, WHITE, "SCORE");
+  numw(3, 14, YELLOW, getscore(), 6);
+  text(122, 4, WHITE, "BALL");
+  for (var k = 0; k < balls; k++) disc(126 + (k % 4) * 8, 20 + (k / 4) * 8, 3, WHITE);
+  text(122, 50, WHITE, "COMBO");
+  numw(122, 60, combo > 2 ? LIME : GRAY, combo, 3);
+  if (st == 0 && (tm & 16)) ctext(70, WHITE, "PRESS A");
+}

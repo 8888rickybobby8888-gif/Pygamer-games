@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PyGamerPortal Level Editor</title>
+<style>
+  :root {
+    --bg: #1b1d24;
+    --panel: #23262f;
+    --panel2: #2b2f3a;
+    --border: #3a3f4d;
+    --text: #e8e8ee;
+    --dim: #9aa0ae;
+    --accent: #5aa9ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  header .sub { color: var(--dim); font-size: 12px; }
+  .field { display: flex; align-items: center; gap: 6px; }
+  .field label { color: var(--dim); font-size: 12px; }
+  input[type=number] {
+    width: 56px;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 4px;
+    padding: 4px 6px;
+  }
+  button {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #0a1420; font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+  #palette {
+    width: 210px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 10px;
+    flex-shrink: 0;
+  }
+  #palette h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); margin: 14px 0 6px; }
+  #palette h2:first-child { margin-top: 0; }
+  .tool {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .tool:hover { background: var(--panel2); }
+  .tool.active { background: var(--panel2); border-color: var(--accent); }
+  .swatch {
+    width: 20px; height: 20px; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #111;
+    border: 1px solid rgba(255,255,255,.15);
+    flex-shrink: 0;
+  }
+  .tool .name { font-size: 12.5px; }
+  .tool .key { margin-left: auto; color: var(--dim); font-size: 11px; }
+  #canvasWrap {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 16px;
+    background: repeating-linear-gradient(45deg, #191b21, #191b21 10px, #16181d 10px, #16181d 20px);
+  }
+  canvas { image-rendering: pixelated; border: 1px solid var(--border); cursor: crosshair; }
+  #status {
+    padding: 8px 16px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    font-size: 12.5px;
+    color: var(--dim);
+    flex-wrap: wrap;
+  }
+  #status .warn { color: #ffb454; }
+  #status .ok { color: #6fdc8c; }
+  #overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55);
+    display: none; align-items: center; justify-content: center; z-index: 10;
+  }
+  #overlay.show { display: flex; }
+  #overlayBox {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    width: min(640px, 92vw); max-height: 82vh; display: flex; flex-direction: column;
+    padding: 16px;
+  }
+  #overlayBox h3 { margin: 0 0 8px; font-size: 14px; }
+  #overlayBox textarea {
+    width: 100%; flex: 1; min-height: 260px; background: #14161b; color: #d7ffb0;
+    border: 1px solid var(--border); border-radius: 4px; padding: 10px;
+    font-family: "Consolas", monospace; font-size: 12.5px; resize: vertical;
+  }
+  #overlayBox .row { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+  #overlayBox .hint { color: var(--dim); font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PyGamerPortal Level Editor</h1>
+  <span class="sub">click/drag to paint &middot; right-click erases &middot; number keys pick tools</span>
+  <div class="field"><label>W</label><input id="wInput" type="number" min="3" max="40" value="10"></div>
+  <div class="field"><label>H</label><input id="hInput" type="number" min="3" max="40" value="7"></div>
+  <button id="resizeBtn">Resize</button>
+  <button id="newBtn">New (walled box)</button>
+  <div style="flex:1"></div>
+  <span id="boardStatus" class="sub">board: checking...</span>
+  <button id="importBtn">Import...</button>
+  <button id="exportBtn">Export code</button>
+  <button id="uploadBtn" class="primary" title="Needs level_editor_server.js running -- see its own comment for how to start it">Upload to PyGamer</button>
+</header>
+
+<main>
+  <div id="palette"></div>
+  <div id="canvasWrap"><canvas id="grid"></canvas></div>
+</main>
+
+<div id="status"></div>
+
+<div id="overlay">
+  <div id="overlayBox">
+    <h3 id="overlayTitle">Export</h3>
+    <textarea id="overlayText" spellcheck="false"></textarea>
+    <div class="hint" id="overlayHint"></div>
+    <div class="row">
+      <button id="overlayCopy">Copy</button>
+      <button id="overlayDownload">Download .txt</button>
+      <button id="overlayApply" class="primary" style="display:none">Load into editor</button>
+      <button id="overlayClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- Tile legend, matching the comment above LEVELS[] in PyGamerPortal.ino ---
+const TILES = [
+  { cat: "Structure", ch: '.', name: 'Floor',            color: '#2b2e3a' },
+  { cat: "Structure", ch: '#', name: 'Wall',              color: '#82828e' },
+  { cat: "Structure", ch: 'N', name: 'Portal-proof wall', color: '#5a4664' },
+  { cat: "Structure", ch: '~', name: 'Pit (shoot across)',color: '#5a0000' },
+  { cat: "Structure", ch: 'I', name: 'Ice (slides you)',  color: '#8cdcff' },
+  { cat: "Structure", ch: 'M', name: 'Mud (slows you)',   color: '#503c1e' },
+  { cat: "Structure", ch: 'F', name: 'Speed boost pad',   color: '#3cff78' },
+
+  { cat: "Start / Goal", ch: 'S', name: 'Player start', color: '#ffff00' },
+  { cat: "Start / Goal", ch: 'G', name: 'Goal',          color: '#00ff5a' },
+
+  { cat: "Objects", ch: 'X', name: 'Box (max 3/level)', color: '#d28c32' },
+  { cat: "Objects", ch: 'Y', name: 'Key',                color: '#ffdc3c' },
+
+  { cat: "Doors & plates", ch: 'D', name: 'Door (opens on any plate)', color: '#d21edc' },
+  { cat: "Doors & plates", ch: 'K', name: 'Locked door (needs key)',   color: '#a0148c' },
+  { cat: "Doors & plates", ch: 'P', name: 'Pressure plate',            color: '#a0a0b4' },
+
+  { cat: "Laser emitters (max 2/level)", ch: '^', name: 'Emitter, fires up',    color: '#ff1414' },
+  { cat: "Laser emitters (max 2/level)", ch: 'v', name: 'Emitter, fires down',  color: '#ff1414' },
+  { cat: "Laser emitters (max 2/level)", ch: '<', name: 'Emitter, fires left',  color: '#ff1414' },
+  { cat: "Laser emitters (max 2/level)", ch: '>', name: 'Emitter, fires right', color: '#ff1414' },
+
+  { cat: "Conveyors", ch: 'u', name: 'Conveyor, forces up',    color: '#465a64' },
+  { cat: "Conveyors", ch: 'd', name: 'Conveyor, forces down',  color: '#465a64' },
+  { cat: "Conveyors", ch: 'l', name: 'Conveyor, forces left',  color: '#465a64' },
+  { cat: "Conveyors", ch: 'r', name: 'Conveyor, forces right', color: '#465a64' },
+
+  { cat: "Fixed teleporters (always on)", ch: 'T', name: 'Teleporter T', color: '#b400ff' },
+  { cat: "Fixed teleporters (always on)", ch: 'U', name: 'Teleporter U', color: '#00ffdc' },
+];
+const CH_INFO = {};
+TILES.forEach(t => CH_INFO[t.ch] = t);
+
+const CELL = 26;
+let W = 10, H = 7;
+let grid = [];
+let current = '#';
+let painting = false;
+let paintValue = '#';
+
+function makeWalledGrid(w, h) {
+  const g = [];
+  for (let r = 0; r < h; r++) {
+    const row = [];
+    for (let c = 0; c < w; c++) {
+      row.push((r === 0 || c === 0 || r === h - 1 || c === w - 1) ? '#' : '.');
+    }
+    g.push(row);
+  }
+  return g;
+}
+
+grid = makeWalledGrid(W, H);
+
+// --- Palette ---
+const paletteEl = document.getElementById('palette');
+function buildPalette() {
+  paletteEl.innerHTML = '';
+  let lastCat = null;
+  let keyNum = 1;
+  TILES.forEach(t => {
+    if (t.cat !== lastCat) {
+      const h2 = document.createElement('h2');
+      h2.textContent = t.cat;
+      paletteEl.appendChild(h2);
+      lastCat = t.cat;
+    }
+    const el = document.createElement('div');
+    el.className = 'tool';
+    el.dataset.ch = t.ch;
+    const shortcut = keyNum <= 9 ? String(keyNum) : '';
+    el.innerHTML = `<div class="swatch" style="background:${t.color}">${t.ch}</div>
+                    <div class="name">${t.name}</div>
+                    <div class="key">${shortcut}</div>`;
+    el.addEventListener('click', () => selectTool(t.ch));
+    paletteEl.appendChild(el);
+    if (shortcut) { t._shortcut = shortcut; keyNum++; }
+  });
+  refreshPaletteActive();
+}
+
+function selectTool(ch) {
+  current = ch;
+  refreshPaletteActive();
+}
+
+function refreshPaletteActive() {
+  document.querySelectorAll('.tool').forEach(el => {
+    el.classList.toggle('active', el.dataset.ch === current);
+  });
+}
+
+buildPalette();
+
+// --- Canvas ---
+const canvas = document.getElementById('grid');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = W * CELL;
+  canvas.height = H * CELL;
+}
+
+function draw() {
+  resizeCanvas();
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.font = '12px Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let r = 0; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      const ch = grid[r][c];
+      const info = CH_INFO[ch] || { color: '#333' };
+      ctx.fillStyle = info.color;
+      ctx.fillRect(c * CELL, r * CELL, CELL - 1, CELL - 1);
+      if (ch !== '.') {
+        ctx.fillStyle = luminance(info.color) > 0.55 ? '#111' : '#fff';
+        ctx.fillText(ch, c * CELL + CELL / 2, r * CELL + CELL / 2 + 1);
+      }
+    }
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,.06)';
+  for (let r = 0; r <= H; r++) {
+    ctx.beginPath(); ctx.moveTo(0, r * CELL); ctx.lineTo(W * CELL, r * CELL); ctx.stroke();
+  }
+  for (let c = 0; c <= W; c++) {
+    ctx.beginPath(); ctx.moveTo(c * CELL, 0); ctx.lineTo(c * CELL, H * CELL); ctx.stroke();
+  }
+  updateStatus();
+}
+
+function luminance(hex) {
+  const r = parseInt(hex.substr(1,2),16)/255;
+  const g = parseInt(hex.substr(3,2),16)/255;
+  const b = parseInt(hex.substr(5,2),16)/255;
+  return 0.299*r + 0.587*g + 0.114*b;
+}
+
+function cellFromEvent(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const c = Math.floor(x / CELL), r = Math.floor(y / CELL);
+  if (r < 0 || r >= H || c < 0 || c >= W) return null;
+  return { r, c };
+}
+
+function paintAt(r, c, val) {
+  // S and G are singletons -- clear any previous one so there's never two.
+  if (val === 'S' || val === 'G') {
+    for (let rr = 0; rr < H; rr++)
+      for (let cc = 0; cc < W; cc++)
+        if (grid[rr][cc] === val) grid[rr][cc] = '.';
+  }
+  grid[r][c] = val;
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const cell = cellFromEvent(e);
+  if (!cell) return;
+  painting = true;
+  paintValue = e.button === 2 ? '.' : current;
+  paintAt(cell.r, cell.c, paintValue);
+  draw();
+});
+canvas.addEventListener('mousemove', (e) => {
+  if (!painting) return;
+  const cell = cellFromEvent(e);
+  if (!cell) return;
+  if (paintValue !== 'S' && paintValue !== 'G') {
+    paintAt(cell.r, cell.c, paintValue);
+    draw();
+  }
+});
+window.addEventListener('mouseup', () => painting = false);
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('overlay').classList.contains('show')) return;
+  const t = TILES.find(t => t._shortcut === e.key);
+  if (t) selectTool(t.ch);
+});
+
+// --- Status / validation ---
+function updateStatus() {
+  const statusEl = document.getElementById('status');
+  let sCount = 0, gCount = 0, xCount = 0, emitCount = 0;
+  for (let r = 0; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      const ch = grid[r][c];
+      if (ch === 'S') sCount++;
+      if (ch === 'G') gCount++;
+      if (ch === 'X') xCount++;
+      if (ch === '^' || ch === 'v' || ch === '<' || ch === '>') emitCount++;
+    }
+  }
+  const parts = [];
+  parts.push(`${W}x${H} tiles`);
+  parts.push(span(sCount === 1, `start: ${sCount}`));
+  parts.push(span(gCount === 1, `goal: ${gCount}`));
+  parts.push(span(xCount <= 3, `boxes: ${xCount}/3`));
+  parts.push(span(emitCount <= 2, `emitters: ${emitCount}/2`));
+  statusEl.innerHTML = parts.join(' &middot; ');
+}
+function span(ok, text) {
+  return `<span class="${ok ? 'ok' : 'warn'}">${text}</span>`;
+}
+
+// --- Resize / New ---
+document.getElementById('resizeBtn').addEventListener('click', () => {
+  const nw = clamp(parseInt(document.getElementById('wInput').value) || W, 3, 40);
+  const nh = clamp(parseInt(document.getElementById('hInput').value) || H, 3, 40);
+  const ng = makeWalledGrid(nw, nh);
+  for (let r = 0; r < Math.min(H, nh); r++)
+    for (let c = 0; c < Math.min(W, nw); c++)
+      ng[r][c] = grid[r][c];
+  W = nw; H = nh; grid = ng;
+  draw();
+});
+
+document.getElementById('newBtn').addEventListener('click', () => {
+  if (!confirm('Clear the grid back to an empty walled box?')) return;
+  grid = makeWalledGrid(W, H);
+  draw();
+});
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// --- Export ---
+function gridToRows() {
+  return grid.map(row => row.join(''));
+}
+
+function exportCode() {
+  const rows = gridToRows();
+  let out = '    {{\n';
+  rows.forEach(r => { out += `        "${r}",\n`; });
+  out += '    }},';
+  return out;
+}
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  document.getElementById('overlayTitle').textContent = 'Export -- paste this into LEVELS[] in PyGamerPortal.ino';
+  document.getElementById('overlayText').value = exportCode();
+  document.getElementById('overlayHint').textContent =
+    'Paste this block as a new entry inside the LEVELS[] array (right after an existing "}}," entry), then re-upload the sketch.';
+  document.getElementById('overlayApply').style.display = 'none';
+  document.getElementById('overlay').classList.add('show');
+});
+
+document.getElementById('importBtn').addEventListener('click', () => {
+  document.getElementById('overlayTitle').textContent = 'Import -- paste a level block (or just the quoted rows)';
+  document.getElementById('overlayText').value = '';
+  document.getElementById('overlayHint').textContent =
+    'Paste a { { "....", "....", ... } }, block copied from the .ino (or any set of "quoted" rows) and click Load.';
+  document.getElementById('overlayApply').style.display = '';
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('overlayText').focus();
+});
+
+document.getElementById('overlayApply').addEventListener('click', () => {
+  const text = document.getElementById('overlayText').value;
+  const matches = [...text.matchAll(/"([^"]*)"/g)].map(m => m[1]);
+  if (matches.length === 0) { alert('No quoted rows found.'); return; }
+  const width = matches[0].length;
+  if (!matches.every(r => r.length === width)) {
+    if (!confirm('Rows have different lengths -- shorter rows will be padded with # on the right. Continue?')) return;
+  }
+  const h = matches.length;
+  const w = Math.max(...matches.map(r => r.length));
+  const ng = [];
+  for (let r = 0; r < h; r++) {
+    const row = [];
+    const src = matches[r];
+    for (let c = 0; c < w; c++) row.push(c < src.length ? src[c] : '#');
+    ng.push(row);
+  }
+  W = w; H = h; grid = ng;
+  document.getElementById('wInput').value = W;
+  document.getElementById('hInput').value = H;
+  draw();
+  document.getElementById('overlay').classList.remove('show');
+});
+
+document.getElementById('overlayCopy').addEventListener('click', () => {
+  const ta = document.getElementById('overlayText');
+  ta.select();
+  document.execCommand('copy');
+});
+
+document.getElementById('overlayDownload').addEventListener('click', () => {
+  const blob = new Blob([document.getElementById('overlayText').value], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'level.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('overlayClose').addEventListener('click', () => {
+  document.getElementById('overlay').classList.remove('show');
+});
+
+// --- Direct upload, via level_editor_server.js -----------------------
+// Only works when this page is loaded from http://localhost:8787 (i.e.
+// the companion server is running and serving the page itself) -- a
+// plain double-clicked file:// page can't reach localhost.
+const boardStatusEl = document.getElementById('boardStatus');
+const serverAvailable = location.protocol === 'http:' || location.protocol === 'https:';
+
+async function refreshBoardStatus() {
+  if (!serverAvailable) {
+    boardStatusEl.textContent = 'board: open via localhost:8787 to enable upload';
+    return;
+  }
+  try {
+    const r = await fetch('/api/status');
+    const j = await r.json();
+    boardStatusEl.textContent = j.connected ? `board: connected (${j.port})` : 'board: not found';
+  } catch (e) {
+    boardStatusEl.textContent = 'board: server unreachable';
+  }
+}
+refreshBoardStatus();
+setInterval(refreshBoardStatus, 4000);
+
+document.getElementById('uploadBtn').addEventListener('click', async () => {
+  if (!serverAvailable) {
+    alert(
+      'Direct upload needs the companion server running.\n\n' +
+      '1. Open a terminal in the PyGamerPortal folder\n' +
+      '2. Run: node level_editor_server.js\n' +
+      '3. Open http://localhost:8787 in your browser (not this file directly)\n\n' +
+      'Until then, use Export code and paste it in manually.'
+    );
+    return;
+  }
+  document.getElementById('overlayTitle').textContent = 'Uploading to PyGamer...';
+  const ta = document.getElementById('overlayText');
+  ta.value = 'Compiling and flashing -- this can take a bit, especially the first time.\n';
+  document.getElementById('overlayHint').textContent = '';
+  document.getElementById('overlayApply').style.display = 'none';
+  document.getElementById('overlay').classList.add('show');
+
+  const btn = document.getElementById('uploadBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: exportCode() }),
+    });
+    const j = await r.json();
+    ta.value = j.log || '(no output)';
+    document.getElementById('overlayTitle').textContent = j.ok ? 'Uploaded successfully' : 'Upload failed';
+  } catch (e) {
+    ta.value += '\nRequest failed: ' + e.message;
+    document.getElementById('overlayTitle').textContent = 'Upload failed';
+  } finally {
+    btn.disabled = false;
+    refreshBoardStatus();
+  }
+});
+
+draw();
+</script>
+</body>
+</html>

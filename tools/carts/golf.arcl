@@ -1,0 +1,127 @@
+// MINI GOLF : 5 holes. Aim, hold A to charge the power, release to putt. Fewest strokes wins.
+@name "MINI GOLF"
+@blurb "Strategy: 5 holes"
+@author "Arcadia"
+@version 1
+@color lime
+@twoplayer
+@lower
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "Left/Right: aim" "Hold A, release: putt" "Fewest strokes wins"
+@icon "........"
+      "....#..."
+      "....##.."
+      "....#..."
+      "....#..."
+      "...##..."
+      ".##..##."
+      "........"
+
+// per hole: teeX teeY cupX cupY then 5 walls x,y,w,h (w=0 unused)
+array lv[120] = {
+  20,70,136,70,  0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+  20,100,136,40, 78,18,6,60, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+  16,30,140,100, 50,18,6,70, 100,52,6,70, 0,0,0,0, 0,0,0,0, 0,0,0,0,
+  20,70,128,70, 100,46,48,5, 100,88,48,5, 144,46,5,47, 0,0,0,0, 0,0,0,0,
+  16,100,140,30, 40,18,6,70, 80,50,6,72, 120,18,6,70, 0,0,0,0, 0,0,0,0 };
+array cupR[4] = {5, 7, 4, 3};
+array sinkV[4] = {80, 110, 60, 45};
+
+var hole, strokes, bx, by, vx, vy, a, pw, pdir, st, tmr, gc, base, hx, hy, moving;
+
+func blocked(x, y) {
+  if (x < 8 || x > 152 || y < 20 || y > 120) return 1;
+  for (var i = 0; i < 5; i++) {
+    var o = base + 4 + i * 4;
+    if (lv[o + 2] > 0 && hit(x - 2, y - 2, 4, 4, lv[o], lv[o + 1], lv[o + 2], lv[o + 3])) return 1;
+  }
+  return 0;
+}
+
+func setup() {
+  base = hole * 24;
+  bx = lv[base] * 16; by = lv[base + 1] * 16;
+  hx = lv[base + 2]; hy = lv[base + 3];
+  vx = 0; vy = 0; pw = 0; pdir = 3; strokes = 0; st = 0;
+  a = hx > lv[base] ? 0 : 128;
+  if (hole == 1) a = 224;
+  if (hole == 2) a = 20;
+  if (hole == 4) a = 224;
+}
+
+func init() {
+  gc = rgb(20, 110, 40);
+  hole = 0;
+  setup();
+}
+
+func finish(s) {
+  addscore(s);
+  hole++;
+  if (hole >= 5) { gameover("ROUND DONE"); return 0; }
+  setup();
+}
+
+func frame() {
+  if (st == 0) {
+    if (btn(LEFT)) a -= 2;
+    if (btn(RIGHT)) a += 2;
+    a = a & 255;
+    if (btn(A)) {
+      pw += pdir;
+      if (pw >= 100) pdir = -3;
+      if (pw <= 0) { pw = 0; pdir = 3; }
+    } else if (pw > 8) {
+      vx = cos(a) * pw / 130;
+      vy = sin(a) * pw / 130;
+      strokes++;
+      st = 1; sfx(0); tone(300, 30);
+      pw = 0; pdir = 3;
+    } else {
+      pw = 0; pdir = 3;
+    }
+  } else if (st == 1) {
+    var nx = bx + vx;
+    if (blocked(nx >> 4, by >> 4)) { vx = -vx * 3 / 4; if (abs(vx) > 20) tone(150, 15); } else bx = nx;
+    var ny = by + vy;
+    if (blocked(bx >> 4, ny >> 4)) { vy = -vy * 3 / 4; if (abs(vy) > 20) tone(150, 15); } else by = ny;
+    vx = vx * 31 / 32; vy = vy * 31 / 32;
+    var dx = (bx >> 4) - hx; var dy = (by >> 4) - hy;
+    var sp = abs(vx) + abs(vy);
+    if (dx * dx + dy * dy < cupR[tier()] * cupR[tier()] && sp < sinkV[tier()]) {
+      st = 2; tmr = 45;
+      burst(hx, hy, 18, YELLOW); sfx(2); led(0, 255, 0, 200); shake(150, 1);
+    } else if (sp < 3) {
+      vx = 0; vy = 0;
+      if (strokes >= 7) { st = 2; tmr = 30; strokes = 7; sfx(3); } else st = 0;
+    }
+  } else {
+    tmr--;
+    if (tmr <= 0) { finish(strokes); return 0; }
+  }
+  cls(gc);
+  rect(8, 20, 144, 2, DKGRAY); rect(8, 120, 144, 2, DKGRAY);
+  rect(6, 20, 2, 102, DKGRAY); rect(152, 20, 2, 102, DKGRAY);
+  for (var i = 0; i < 5; i++) {
+    var o = base + 4 + i * 4;
+    if (lv[o + 2] > 0) { rect(lv[o], lv[o + 1], lv[o + 2], lv[o + 3], BROWN); box(lv[o], lv[o + 1], lv[o + 2], lv[o + 3], ORANGE); }
+  }
+  disc(hx, hy, cupR[tier()] + 1, BLACK);
+  line(hx, hy, hx, hy - 12, WHITE); rect(hx, hy - 12, 6, 4, RED);
+  var bxp = bx >> 4; var byp = by >> 4;
+  if (st < 2 || tmr > 25) { disc(bxp + 1, byp + 1, 3, DKGRAY); disc(bxp, byp, 2, WHITE); }
+  if (st == 0) {
+    var len = 10 + pw / 3;
+    line(bxp, byp, bxp + cos(a) * len / 127, byp + sin(a) * len / 127, YELLOW);
+    box(4, 124, 60, 4, WHITE);
+    rect(5, 125, pw * 58 / 100, 2, pw > 70 ? RED : LIME);
+  }
+  rect(0, 0, 160, 16, NAVY);
+  text(4, 4, WHITE, "HOLE");
+  num(34, 4, YELLOW, hole + 1);
+  text(52, 4, WHITE, "STROKES");
+  num(100, 4, YELLOW, strokes);
+  text(116, 4, WHITE, "TOT");
+  numw(138, 4, CYAN, getscore(), 2);
+  if (st == 2 && strokes < 7) ctext(70, YELLOW, strokes == 1 ? "HOLE IN ONE" : "IN THE CUP");
+}

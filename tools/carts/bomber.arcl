@@ -1,0 +1,271 @@
+// BOMBER ARENA : blow up crates, grab power-ups, and catch the CPU in a blast.
+@name "BOMBER ARENA"
+@blurb "Battle: bombs vs CPU"
+@author "Arcadia"
+@version 1
+@color red
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: move" "A: drop a bomb" "Stay out of the blast!"
+@icon "...##..."
+      "..#.#..."
+      "..#....."
+      ".######."
+      "########"
+      "########"
+      "########"
+      ".######."
+@sprite wall  "########"
+              "#.######"
+              "########"
+              "####.###"
+              "########"
+              "##.#####"
+              "########"
+              "######.#"
+@sprite crate "########"
+              "#.#..#.#"
+              "##.##.##"
+              "#.#..#.#"
+              "#.#..#.#"
+              "##.##.##"
+              "#.#..#.#"
+              "########"
+@sprite bomb  "....#.#."
+              ".....#.."
+              "..####.."
+              ".######."
+              "########"
+              "########"
+              ".######."
+              "..####.."
+@sprite purng "...##..."
+              "..####.."
+              ".##..##."
+              "##.##.##"
+              "##.##.##"
+              ".##..##."
+              "..####.."
+              "...##..."
+@sprite pubmb "########"
+              "#......#"
+              "#.####.#"
+              "#.#..#.#"
+              "#.####.#"
+              "#.#..#.#"
+              "#......#"
+              "########"
+@sprite fire  "#..##..#"
+              ".#.##.#."
+              "..####.."
+              "########"
+              "########"
+              "..####.."
+              ".#.##.#."
+              "#..##..#"
+@sprite man   "..####.."
+              ".######."
+              ".#.##.#."
+              "..####.."
+              "..####.."
+              ".######."
+              "#.####.#"
+              "..#..#.."
+
+const W = 20;
+const H = 14;
+const WALL = 65;
+const CRATE = 130;
+const BOMB = 195;
+const PUR = 260;
+const PUB = 325;
+array cpuT[4] = {8, 11, 6, 4};
+array aggr[4] = {7, 3, 12, 20};
+array m[280];
+array ft[280];
+array dz[280];
+array bl[8];
+array bt[8];
+array br[8];
+array bo[8];
+var px, py, cx, cy, pmax, pr, cmax, cr, pc, cc, mt, ct, endT, res, tleft, lives = 3, round, now, nb, lastF;
+
+func dxf(d) { return d == 0 ? 1 : (d == 2 ? -1 : 0); }
+func dyf(d) { return d == 1 ? 1 : (d == 3 ? -1 : 0); }
+func isfree(x, y) { var c = m[y * W + x]; return c == 0 || c == PUR || c == PUB; }
+func danger(x, y) {
+  var i = y * W + x;
+  return dz[i] == now || ft[i] > now || m[i] == BOMB;
+}
+func esc(x, y) {
+  if (!danger(x, y)) return 1;
+  for (var d = 0; d < 4; d++) {
+    if (isfree(x + dxf(d), y + dyf(d)) && !danger(x + dxf(d), y + dyf(d))) return 1;
+  }
+  return 0;
+}
+
+func mark(c0, r) {
+  for (var d = 0; d < 4; d++) {
+    for (var k = 0; k <= r; k++) {
+      if (k == 0 && d > 0) continue;
+      var j = c0 + (dyf(d) * W + dxf(d)) * k;
+      var c = m[j];
+      if (c == WALL || c == CRATE) break;
+      dz[j] = now;
+      if (c == BOMB && k > 0) break;
+    }
+  }
+}
+
+func build() {
+  memfill(m, 280, 0); memfill(ft, 280, 0); memfill(dz, 280, 0);
+  for (var i = W + 1; i < W * H - W - 1; i++) if (rnd(100) < 52) m[i] = CRATE;
+  for (var x = 0; x < W; x++) { m[x] = WALL; m[W * H - 1 - x] = WALL; }
+  for (var y = 0; y < H; y++) { m[y * W] = WALL; m[y * W + W - 1] = WALL; }
+  for (var yy = 2; yy < H - 1; yy += 2) for (var xx = 2; xx < W - 1; xx += 2) m[yy * W + xx] = WALL;
+  m[21] = 0; m[22] = 0; m[41] = 0; m[W * 12 + 18] = 0; m[W * 12 + 17] = 0; m[W * 11 + 18] = 0;
+  px = 1; py = 1; cx = 18; cy = 12; pmax = 1; pr = 2; cmax = 1; cr = 2; pc = 0; cc = 0;
+  mt = 0; ct = 0; endT = 0; res = 0; tleft = 100 * 30; now = 50; nb = 0; lastF = 0;
+}
+
+func init() {
+  setpal(1, GRAY); setpal(2, BROWN); setpal(3, WHITE); setpal(4, ORANGE); setpal(5, LIME);
+  build();
+}
+
+func drop(x, y, who, r) {
+  var i = y * W + x;
+  m[i] = BOMB;
+  bl[nb] = i; bt[nb] = 70; br[nb] = r; bo[nb] = who; nb++;
+  if (who == 1) pc++; else cc++;
+  tone(250, 15);
+}
+
+func explode(k) {
+  var i = bl[k]; var r = br[k];
+  if (bo[k] == 1) pc--; else cc--;
+  nb--;
+  bl[k] = bl[nb]; bt[k] = bt[nb]; br[k] = br[nb]; bo[k] = bo[nb];
+  m[i] = 0; ft[i] = now + 12; lastF = now + 12;
+  burst((i % W) * 8 + 4, (i / W) * 8 + 20, 10, ORANGE);
+  sfx(3); shake(150, 2);
+  for (var d = 0; d < 4; d++) {
+    for (var q = 1; q <= r; q++) {
+      var j = i + (dyf(d) * W + dxf(d)) * q;
+      var c = m[j];
+      if (c == WALL) break;
+      ft[j] = now + 12;
+      if (c == CRATE) { m[j] = rnd(100) < 32 ? (rnd(2) ? PUR : PUB) : 0; break; }
+      if (c == BOMB) { for (var z = 0; z < nb; z++) if (bl[z] == j) bt[z] = 1; break; }
+      if (c != 0) { m[j] = 0; break; }
+    }
+  }
+}
+
+func pickup(x, y, who) {
+  var i = y * W + x;
+  var c = m[i];
+  if (c == PUR) { if (who == 1) { if (pr < 6) pr++; } else if (cr < 6) cr++; }
+  else if (c == PUB) { if (who == 1) { if (pmax < 3) pmax++; } else if (cmax < 3) cmax++; }
+  else return 0;
+  m[i] = 0;
+  if (who == 1) { sfx(4); addscore(5); }
+}
+
+func cpuMove() {
+  var best = -1; var bd = -1; var off = rnd(4);
+  if (danger(cx, cy)) {
+    for (var q = 0; q < 4; q++) {
+      var d = (q + off) & 3;
+      var nx = cx + dxf(d); var ny = cy + dyf(d);
+      if (isfree(nx, ny)) {
+        var s = 1;
+        if (!danger(nx, ny)) s = 10; else if (esc(nx, ny)) s = 5;
+        if (s > best) { best = s; bd = d; }
+      }
+    }
+  } else {
+    var ddx = px - cx; var ddy = py - cy;
+    var pd1 = abs(ddx) > abs(ddy) ? (ddx > 0 ? 0 : 2) : (ddy > 0 ? 1 : 3);
+    var pd2 = abs(ddx) > abs(ddy) ? (ddy > 0 ? 1 : 3) : (ddx > 0 ? 0 : 2);
+    if (aggr[tier()] < 5 && rnd(3) == 0) pd1 = rnd(4);
+    var bl1 = m[(cy + dyf(pd1)) * W + cx + dxf(pd1)];
+    var near = abs(ddx) + abs(ddy) <= 3 && (ddx == 0 || ddy == 0);
+    if (cc < cmax && nb < 6 && (bl1 == CRATE || near || rnd(100) < aggr[tier()])) {
+      var ok = tier() == 1;
+      for (var e = 0; e < 4; e++) {
+        var ex = cx + dxf(e); var ey = cy + dyf(e);
+        if (isfree(ex, ey) && (isfree(ex + dyf(e), ey + dxf(e)) || isfree(ex - dyf(e), ey - dxf(e)))) ok = 1;
+      }
+      if (ok) drop(cx, cy, 2, cr);
+    }
+    for (var z = 0; z < 3; z++) {
+      var dd = z == 0 ? pd1 : (z == 1 ? pd2 : rnd(4));
+      if (isfree(cx + dxf(dd), cy + dyf(dd)) && !danger(cx + dxf(dd), cy + dyf(dd))) { bd = dd; break; }
+    }
+  }
+  if (bd >= 0) { cx += dxf(bd); cy += dyf(bd); pickup(cx, cy, 2); }
+}
+
+func frame() {
+  now++;
+  if (endT > 0) {
+    endT--;
+    if (endT == 0) {
+      if (res == 2) { round++; addscore(100 + tleft / 30); build(); }
+      else if (res == 0) { build(); }
+      else {
+        if (lives <= 0) { gameover("BLOWN UP"); return 0; }
+        build();
+      }
+    }
+  } else {
+    tleft--;
+    if (tleft <= 0) { endT = 20; res = 0; }
+    mt++;
+    if (mt >= 5) {
+      var dd = -1;
+      if (btn(RIGHT)) dd = 0; else if (btn(DOWN)) dd = 1; else if (btn(LEFT)) dd = 2; else if (btn(UP)) dd = 3;
+      if (dd >= 0 && isfree(px + dxf(dd), py + dyf(dd))) { px += dxf(dd); py += dyf(dd); mt = 0; pickup(px, py, 1); }
+    }
+    if (btnp(A) && pc < pmax && m[py * W + px] == 0) drop(px, py, 1, pr);
+    for (var k = nb - 1; k >= 0; k--) {
+      bt[k]--;
+      if (bt[k] <= 0) explode(k);
+    }
+    for (var b = 0; b < nb; b++) mark(bl[b], br[b]);
+    ct++;
+    if (ct >= cpuT[tier()] - (round > 3 ? 2 : 0)) { ct = 0; cpuMove(); }
+    var pdead = ft[py * W + px] > now;
+    var cdead = ft[cy * W + cx] > now;
+    if (pdead || cdead) {
+      endT = 45;
+      res = pdead ? (cdead ? 3 : 1) : 2;
+      if (pdead) { lives--; burst(px * 8 + 4, py * 8 + 20, 18, CYAN); }
+      if (cdead) burst(cx * 8 + 4, cy * 8 + 20, 18, RED);
+      shake(300, 3); led(pdead ? 255 : 0, pdead ? 0 : 255, 0, 300);
+      if (cdead && !pdead) sfx(2);
+    }
+  }
+  cls(rgb(10, 40, 12));
+  drawmap(m, W, H, 0, 16);
+  if (lastF > now) {
+    for (var f = 0; f < 280; f++) if (ft[f] > now) spr((f % W) * 8, 16 + (f / W) * 8, 5, (now & 2) ? YELLOW : ORANGE);
+  }
+  if (!(endT > 0 && res != 2)) spr(px * 8, 16 + py * 8, 6, CYAN);
+  if (!(endT > 0 && res != 1)) spr(cx * 8, 16 + cy * 8, 6, RED);
+  rect(0, 0, 160, 16, NAVY);
+  text(2, 1, WHITE, "RND");
+  num(24, 1, LIME, round + 1);
+  text(2, 9, WHITE, "SC");
+  numw(16, 9, YELLOW, getscore(), 5);
+  text(60, 1, WHITE, "BOMB");
+  num(86, 1, CYAN, pmax);
+  text(60, 9, WHITE, "RANGE");
+  num(92, 9, CYAN, pr);
+  text(104, 1, WHITE, "T");
+  numw(112, 1, YELLOW, tleft / 30, 3);
+  for (var l = 0; l < lives; l++) rect(132 + l * 9, 9, 6, 6, RED);
+  if (endT > 0 && (endT & 4)) ctext(60, WHITE, res == 2 ? "YOU WIN" : (res == 0 ? "TIME UP" : "BOOM"));
+}

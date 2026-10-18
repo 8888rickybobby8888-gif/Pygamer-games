@@ -1,0 +1,307 @@
+// TINY DUNGEON : a turn-based crawler. Every floor is freshly generated.
+//   Bump enemies to attack. Potions heal, gold scores. Find the stairs (>) to go deeper.
+@name "TINY DUNGEON"
+@blurb "Quest: crawl the depths"
+@author "Arcadia"
+@version 1
+@color orange
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: walk / attack" "Potions heal, gold pts" "A: wait  >: stairs down"
+@icon "########"
+      "#......#"
+      "#.#..#.#"
+      "#..@.#.#"
+      "#.#..#.#"
+      "#......#"
+      "#...>..#"
+      "########"
+@sprite wall   "########"
+               "#.######"
+               "########"
+               "####.###"
+               "########"
+               "##.#####"
+               "########"
+               "######.#"
+@sprite floor  "........"
+               "........"
+               "...#...."
+               "........"
+               "........"
+               "......#."
+               "........"
+               "........"
+@sprite stairs "########"
+               "#......#"
+               "#.####.#"
+               "#.#..#.#"
+               "#.####.#"
+               "#......#"
+               "#..##..#"
+               "########"
+@sprite potion "...##..."
+               "...##..."
+               "..####.."
+               ".######."
+               ".######."
+               ".######."
+               "..####.."
+               "........"
+@sprite gold   "........"
+               "..####.."
+               ".######."
+               ".##..##."
+               ".##..##."
+               ".######."
+               "..####.."
+               "........"
+@sprite hero   "..####.."
+               ".#.##.#."
+               "..####.."
+               "...##..."
+               ".######."
+               "#.####.#"
+               "..#..#.."
+               ".##..##."
+@sprite bat    "#......#"
+               "##....##"
+               "########"
+               ".######."
+               "..#..#.."
+               "...##..."
+               "........"
+               "........"
+@sprite slime  "........"
+               "..####.."
+               ".######."
+               "##.##.##"
+               "########"
+               "########"
+               ".######."
+               "........"
+@sprite skel   "..####.."
+               ".#.##.#."
+               "..####.."
+               "...##..."
+               ".######."
+               "...##..."
+               "..#..#.."
+               ".##..##."
+
+const W = 20;
+const H = 12;
+const NE = 10;
+array map[240];              // drawmap tiles (0 = none, wall = 65, floor = 130, stairs, potion, gold)
+array ex[10];
+array ey[10];
+array ehp[10];
+array et[10];                // 0 none, 1 bat, 2 slime, 3 skeleton
+array rx[8];
+array ry[8];
+array rw[8];
+array rh[8];
+array startHp[4] = {16, 24, 12, 9};
+
+var px, py, hp, maxhp, depth, atk, kills, rooms, repT, turn, flash, msgT, msgK, hurtT, shown;
+
+func init() {
+  setpal(1, rgb(95, 95, 120));
+  setpal(2, DKGRAY);
+  setpal(3, YELLOW);
+  setpal(4, PINK);
+  setpal(5, CYAN);
+  maxhp = startHp[tier()]; hp = maxhp; depth = 1; atk = 0;
+  genFloor();
+}
+
+func carve(x0, y0, w, h) {
+  for (var y = y0; y < y0 + h; y++)
+    for (var x = x0; x < x0 + w; x++)
+      if (x > 0 && y > 0 && x < W - 1 && y < H - 1) map[y * W + x] = 130;
+}
+
+func tileAt(x, y) {
+  if (x < 0 || y < 0 || x >= W || y >= H) return 65;
+  return map[y * W + x];
+}
+
+func enemyAt(x, y) {
+  for (var i = 0; i < NE; i++) if (et[i] && ex[i] == x && ey[i] == y) return i;
+  return -1;
+}
+
+func freeSpot() {
+  for (var t = 0; t < 30; t++) {
+    var i = rnd(rooms);
+    var x = rx[i] + rnd(rw[i]);
+    var y = ry[i] + rnd(rh[i]);
+    if (tileAt(x, y) == 130 && enemyAt(x, y) < 0 && !(x == px && y == py)) return y * W + x;
+  }
+  return -1;
+}
+
+func genFloor() {
+  memfill(map, 240, 65);
+  for (var i = 0; i < NE; i++) et[i] = 0;
+  rooms = 0;
+  for (var t = 0; t < 30 && rooms < 6; t++) {
+    var w = 3 + rnd(5);
+    var h = 3 + rnd(3);
+    var x = 1 + rnd(W - w - 2);
+    var y = 1 + rnd(H - h - 2);
+    var ok = 1;
+    for (var k = 0; k < rooms; k++)
+      if (hit(x - 1, y - 1, w + 2, h + 2, rx[k], ry[k], rw[k], rh[k])) ok = 0;
+    if (ok) {
+      rx[rooms] = x; ry[rooms] = y; rw[rooms] = w; rh[rooms] = h;
+      carve(x, y, w, h);
+      rooms++;
+    }
+  }
+  wait();
+  // corridors between consecutive rooms
+  for (var k = 1; k < rooms; k++) {
+    var ax = rx[k - 1] + rw[k - 1] / 2;
+    var ay = ry[k - 1] + rh[k - 1] / 2;
+    var bx = rx[k] + rw[k] / 2;
+    var by = ry[k] + rh[k] / 2;
+    var x = ax;
+    while (x != bx) { carve(x, ay, 1, 1); x += (bx > x) ? 1 : -1; }
+    var y = ay;
+    while (y != by) { carve(bx, y, 1, 1); y += (by > y) ? 1 : -1; }
+  }
+  px = rx[0] + rw[0] / 2;
+  py = ry[0] + rh[0] / 2;
+  wait();
+  // stairs in the last room
+  var sx = rx[rooms - 1] + rw[rooms - 1] / 2;
+  var sy = ry[rooms - 1] + rh[rooms - 1] / 2;
+  map[sy * W + sx] = 3 | (5 << 6);
+  // items and monsters
+  for (var i = 0; i < 4 + rnd(3); i++) { var c = freeSpot(); if (c >= 0) map[c] = 5 | (3 << 6); }
+  for (var i = 0; i < 1 + rnd(2); i++) { var c = freeSpot(); if (c >= 0) map[c] = 4 | (4 << 6); }
+  wait();
+  var n = 3 + depth + tier();
+  if (n > NE) n = NE;
+  for (var i = 0; i < n; i++) {
+    var c = freeSpot();
+    if (c >= 0 && c != py * W + px) {
+      ex[i] = c % W; ey[i] = c / W;
+      var r = rnd(100);
+      et[i] = 1;
+      if (depth > 1 && r > 45) et[i] = 2;
+      if (depth > 2 && r > 75) et[i] = 3;
+      ehp[i] = et[i] == 1 ? 2 : (et[i] == 2 ? 4 + depth / 2 : 5 + depth);
+    }
+  }
+  msgT = 40; msgK = 0;
+  if (depth > 1) addscore(50);
+}
+
+func hurtPlayer(d) {
+  hp -= d;
+  hurtT = 6;
+  sfx(6); shake(100, 1);
+  if (hp <= 0) {
+    hp = 0;
+    sfx(3); led(255, 0, 0, 200);
+    addscore(depth * 20);
+    gameover("YOU DIED");
+  }
+}
+
+func enemyTurn() {
+  for (var i = 0; i < NE; i++) {
+    if (!et[i]) continue;
+    var dx = px - ex[i];
+    var dy = py - ey[i];
+    var dist = abs(dx) + abs(dy);
+    if (dist == 1) {
+      if (rnd(100) < 70) hurtPlayer(1 + rnd(2 + depth / 2) + (et[i] == 3 ? 1 : 0));
+      continue;
+    }
+    var mx = 0;
+    var my = 0;
+    if (et[i] == 1) { mx = rnd(3) - 1; if (rnd(2)) { my = rnd(3) - 1; mx = 0; } }
+    else if (dist < 8 && (et[i] == 3 || rnd(100) < 60)) {
+      if (abs(dx) > abs(dy)) mx = sign(dx); else my = sign(dy);
+    }
+    var nx = ex[i] + mx;
+    var ny = ey[i] + my;
+    if ((mx || my) && tileAt(nx, ny) != 65 && enemyAt(nx, ny) < 0 && !(nx == px && ny == py)) { ex[i] = nx; ey[i] = ny; }
+  }
+}
+
+func move(dx, dy) {
+  var nx = px + dx;
+  var ny = py + dy;
+  var e = enemyAt(nx, ny);
+  if (e >= 0) {
+    var d = 1 + rnd(3) + atk;
+    ehp[e] -= d;
+    sfx(0); burst(nx * 8 + 4, 16 + ny * 8 + 4, 6, RED);
+    if (ehp[e] <= 0) {
+      et[e] = 0; kills++;
+      addscore(5 + depth * 2);
+      sfx(4);
+      if (kills % 4 == 0) { atk++; maxhp += 2; hp = min(maxhp, hp + 2); msgT = 40; msgK = 3; sfx(2); }
+    }
+    return 1;
+  }
+  var t = tileAt(nx, ny);
+  if (t == 65) { sfx(8 - 8); return 0; }
+  px = nx; py = ny;
+  sfx(7);
+  var base = t & 63;
+  if (base == 5) { map[ny * W + nx] = 130; addscore(10); sfx(4); msgT = 20; msgK = 1; }
+  if (base == 4) { map[ny * W + nx] = 130; hp = min(maxhp, hp + 6); sfx(2); msgT = 20; msgK = 2; }
+  if (base == 3) { depth++; sfx(2); genFloor(); return 0; }
+  return 1;
+}
+
+func frame() {
+  var dx = 0;
+  var dy = 0;
+  var go = 0;
+  if (btnp(LEFT))  { dx = -1; go = 1; repT = 8; }
+  if (btnp(RIGHT)) { dx = 1;  go = 1; repT = 8; }
+  if (btnp(UP))    { dy = -1; go = 1; repT = 8; }
+  if (btnp(DOWN))  { dy = 1;  go = 1; repT = 8; }
+  if (!go && (btn(LEFT) || btn(RIGHT) || btn(UP) || btn(DOWN))) {
+    repT--;
+    if (repT <= 0) {
+      repT = 4; go = 1;
+      if (btn(LEFT)) dx = -1; else if (btn(RIGHT)) dx = 1; else if (btn(UP)) dy = -1; else dy = 1;
+    }
+  }
+  if (btnp(A)) go = 2;
+  if (go == 2) { enemyTurn(); turn++; }
+  else if (go == 1) {
+    var acted = move(dx, dy);
+    if (acted) { enemyTurn(); turn++; }
+  }
+  flash++;
+  if (hurtT > 0) hurtT--;
+  if (msgT > 0) msgT--;
+
+  cls(BLACK);
+  drawmap(map, W, H, 0, 16);
+  for (var i = 0; i < NE; i++) {
+    if (et[i]) {
+      var col = et[i] == 1 ? PINK : (et[i] == 2 ? LIME : WHITE);
+      spr(ex[i] * 8, 16 + ey[i] * 8, et[i] == 1 ? bat : (et[i] == 2 ? slime : skel), col);
+    }
+  }
+  spr(px * 8, 16 + py * 8, hero, hurtT ? RED : CYAN);
+  // HUD
+  text(2, 3, WHITE, "HP");
+  rect(16, 3, maxhp * 2, 7, DKGRAY);
+  rect(16, 3, hp * 2, 7, hp * 3 < maxhp ? RED : GREEN);
+  text(88, 3, WHITE, "D");
+  num(96, 3, CYAN, depth);
+  text(112, 3, YELLOW, "$");
+  num(120, 3, YELLOW, getscore());
+  text(2, 114, GRAY, "ATK");
+  num(26, 114, ORANGE, atk + 1);
+  if (msgT > 0) ctext(118, YELLOW, msgK == 0 ? "NEW FLOOR" : (msgK == 1 ? "GOLD!" : (msgK == 2 ? "HEALED" : "LEVEL UP!")));
+}

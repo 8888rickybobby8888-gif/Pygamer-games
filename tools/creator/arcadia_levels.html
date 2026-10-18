@@ -1,0 +1,1091 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arcadia Level Creator</title>
+<style>
+:root{--bg:#14161b;--panel:#1c1f27;--panel2:#242834;--line:#333948;--fg:#e6e9f0;--dim:#9aa3b5;--acc:#4da3ff;--ok:#3fbf6a;--warn:#e0b341;--bad:#ef5b5b}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.4 system-ui,Segoe UI,Arial,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{font-size:15px;margin:0 8px 0 0}
+select,input,button,textarea{font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:4px 8px}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+button.pri{background:#24508a;border-color:#3a74c4}
+button.on{background:#24508a;border-color:var(--acc)}
+button:disabled{opacity:.4;cursor:default}
+input[type=number]{width:60px}input[type=text]{width:130px}
+main{display:grid;grid-template-columns:230px minmax(0,1fr) 300px;gap:10px;padding:10px}
+@media(max-width:1000px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px}
+.card h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}
+.lvl{display:flex;gap:6px;align-items:center;padding:3px 6px;border-radius:5px;cursor:pointer;border:1px solid transparent}
+.lvl:hover{background:var(--panel2)}.lvl.sel{background:#1f3556;border-color:var(--acc)}
+.lvl .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--ok);flex:none}.dot.w{background:var(--warn)}.dot.e{background:var(--bad)}
+.tag{font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+#cvwrap{overflow:auto;background:#0d0f13;border:1px solid var(--line);border-radius:6px;padding:10px;text-align:center;min-height:120px}
+canvas{image-rendering:pixelated;touch-action:none;cursor:crosshair;max-width:none}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;margin:2px;border:2px solid var(--line);border-radius:5px;cursor:pointer;font-size:12px}
+.chip.sel{border-color:#fff}.chip i{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid #0006}
+.msg{margin:2px 0;padding:3px 6px;border-radius:4px;font-size:12px}
+.msg.e{background:#4a1d1d;color:#ffb3b3}.msg.w{background:#4a3d12;color:#ffe3a1}.msg.o{background:#183a25;color:#a6efc0}.msg.i{background:var(--panel2);color:var(--dim)}
+small,.dim{color:var(--dim)}
+table{border-collapse:collapse;width:100%}td,th{padding:2px 3px;text-align:left;font-size:12px}td input{width:48px;padding:2px 4px}td input.str{width:100%}
+#map{display:grid;gap:3px}#map button{padding:0;height:34px;font-size:10px}
+#status{margin-left:auto;color:var(--dim);max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hint{font-size:11px;color:var(--dim);margin-top:6px}
+#drop{position:fixed;inset:0;background:#000a;color:#fff;display:none;align-items:center;justify-content:center;font-size:24px;z-index:20;pointer-events:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Arcadia Level Creator</h1>
+  <select id="mode" title="What to edit"></select>
+  <button id="btnImport" title="Import .lvl / .pak / portal.lvl / portal_levels.txt / quest.wld (or drop files on the page)">Import files...</button>
+  <input id="fileIn" type="file" multiple hidden>
+  <button id="btnAll" class="pri" title="One zip with everything you made, laid out like the PyGamer drive">Export everything (drive zip)</button>
+  <button id="btnReset" title="Forget all work stored in this browser">Clear all</button>
+  <span id="status"></span>
+</header>
+<div id="drop">Drop level files to import</div>
+<main>
+  <aside id="left"></aside>
+  <section id="center">
+    <div class="card"><div id="tools" class="row"></div><div id="cvwrap"><canvas id="cv" width="10" height="10"></canvas></div><div id="hint" class="hint"></div></div>
+    <div class="card"><h3>Checks</h3><div id="checks"></div></div>
+    <div id="centerExtra"></div>
+  </section>
+  <aside id="right"></aside>
+</main>
+
+<script id="core">
+/* ===================================================================================================
+   CORE (no DOM): game tables, validators, binary formats. The test harness evals this script in node.
+   =================================================================================================== */
+'use strict';
+const NO_BEST = -2147483648;
+
+/* kLevelGames[] of PyGamerPortal.ino: id, name, w, h (max grid), default tile, flags, tiles [name,color] */
+const G = [
+ {id:0, name:'SOKOBAN MINI', w:7, h:7, def:0, t:[['Floor','#2d3340'],['Wall','#8c6a4a'],['Box','#d6a53c'],['Goal','#3fbf6a'],['Start','#4da3ff']], rules:'1 Start; 1-2 boxes; goals = boxes. (Pack rule: must be solvable.)'},
+ {id:1, name:'TILT MAZE', w:10, h:7, def:0, t:[['Floor','#2d3340'],['Hole','#05060a'],['Goal','#3fbf6a'],['Start','#4da3ff']], rules:'Exactly 1 Start and 1 Goal; at most 6 holes.'},
+ {id:2, name:'BREAKOUT', w:10, h:4, def:0, t:[['Empty','#2d3340'],['Brick','#e8793a']], rules:'At least 1 brick.'},
+ {id:3, name:'PLATFORM DASH', w:10, h:1, def:0, oneD:1, t:[['Safe','#2d3340'],['Pit','#05060a'],['Block','#e8793a'],['Finish','#3fbf6a']], rules:'Exactly 1 Finish; first cell must be Safe.'},
+ {id:4, name:'SPEED MAZE', w:9, h:7, def:0, t:[['Floor','#2d3340'],['Wall','#8c6a4a'],['Start','#4da3ff'],['Goal','#3fbf6a']], rules:'1 Start, 1 Goal, goal reachable. (Pack rule: border should be wall - the raycaster draws it.)'},
+ {id:5, name:'SPACE INVADERS', w:5, h:3, def:0, t:[['Empty','#2d3340'],['Enemy','#e8793a']], rules:'At least 1 enemy.'},
+ {id:6, name:'SNAKE', w:10, h:7, def:0, t:[['Empty','#2d3340'],['Wall','#8c6a4a']], rules:'1-24 wall blocks (each = 2x2 snake cells); keep middle row (row 4, cols 4-8) clear.'},
+ {id:7, name:'WALL PONG', w:10, h:7, def:0, t:[['Empty','#2d3340'],['Block','#8c6a4a']], rules:'1-14 blocks; left and right columns clear; centre (col 6,row 4) clear.'},
+ {id:8, name:'MINESWEEPER', w:10, h:8, def:0, t:[['Empty','#2d3340'],['Mine','#d94141']], rules:'1 .. (w*h-9) mines.'},
+ {id:9, name:'FLOOD FILL', w:10, h:10, def:0, t:[['Red','#d94141'],['Green','#3fbf6a'],['Blue','#4d7fff'],['Yellow','#e8d13a'],['Purple','#a85fe0'],['Orange','#f08a2c']], rules:'2+ colours. Board = min(w,h) square from the top-left. (Pack rule: greedy solution within the move limit.)'},
+ {id:10,name:'CUBE DASH', w:24, h:4, def:0, t:[['Ground','#2d3340'],['Spike','#d94141'],['Block','#8c6a4a'],['Pit','#05060a'],['2Spike','#f08a2c']], rules:'3+ obstacles. Cells read row by row = one track. (Pack rule: bot must clear it at all 4 speeds - use "Deep check".)'},
+ {id:11,name:'BEAT TAPPER', w:16, h:4, def:0, t:[['Empty','#2d3340'],['Note','#4da3ff']], rules:'At least 8 notes. Column = step, row = lane.'},
+ {id:12,name:'LUNAR LANDER', w:20, h:1, def:0, oneD:1, bars:1, t:[['Hgt 0','#6b7280'],['Hgt 1','#6b7280'],['Hgt 2','#6b7280'],['Hgt 3','#6b7280'],['Hgt 4','#6b7280'],['Hgt 5','#6b7280'],['Hgt 6','#6b7280'],['Hgt 7','#6b7280'],['Hgt 8','#6b7280'],['PAD','#e8d13a']], rules:'Exactly one run of PAD tiles, 3+ wide. Heights 0-8.'},
+ {id:13,name:'LIGHTS OUT', w:5, h:5, def:0, t:[['Off','#2d3340'],['On','#e8d13a']], rules:'At least 1 light on and the pattern must be solvable (both parity checks).'},
+ {id:14,name:'MAZE CHASE', w:10, h:14, def:0, t:[['Wall','#3b4a8c'],['Dot','#e8d13a'],['Empty','#14161b'],['Player','#4da3ff'],['Ghost','#d94141']], rules:'LEFT half of a 20x14 maze (mirrored). 1 Player, 1 Ghost (>3 steps away, also from the mirror), 10+ dots, all reachable.'},
+ {id:15,name:'PLINKO', w:9, h:9, def:0, t:[['Empty','#2d3340'],['Peg','#c9d1e0'],['Bumper','#e8793a']], rules:'At least 10 pegs/bumpers in total.'},
+ {id:16,name:'TANK DUEL', w:20, h:1, def:0, oneD:1, bars:1, t:[['Hgt 0','#6b7280'],['Hgt 1','#6b7280'],['Hgt 2','#6b7280'],['Hgt 3','#6b7280'],['Hgt 4','#6b7280'],['Hgt 5','#6b7280'],['Hgt 6','#6b7280'],['Hgt 7','#6b7280'],['Hgt 8','#6b7280']], rules:'20 ground columns, heights 0-8, not all equal.'},
+ {id:17,name:'AIR HOCKEY', w:10, h:7, def:0, t:[['Empty','#2d3340'],['Block','#8c6a4a']], rules:'1-16 blocks; left and right columns (goals) clear; centre cells (cols 5,6 row 4) clear.'},
+ {id:18,name:'GAP FLYER', w:20, h:1, def:3, oneD:1, bars:1, t:[['Lowest','#6b7280'],['Low','#6b7280'],['Lo-mid','#6b7280'],['Mid','#6b7280'],['Hi-mid','#6b7280'],['High','#6b7280'],['Highest','#6b7280']], rules:'5+ walls (columns); each cell = height 0-6 of that wall\'s gap.'},
+ {id:19,name:'ROAD CROSS', w:9, h:1, def:0, oneD:1, t:[['Safe','#2d3340'],['Road <','#555c6b'],['Road >','#555c6b'],['Fast <','#a35a3a'],['Fast >','#a35a3a'],['River <','#2e6fb0'],['River >','#2e6fb0']], rules:'All 9 lanes; first and last must be Safe; 2+ hazard lanes.'},
+ {id:20,name:'BLOCK STACK', w:10, h:8, def:0, t:[['Empty','#2d3340'],['Grey','#8a93a5'],['Red','#d94141'],['Blue','#4d7fff'],['Green','#3fbf6a'],['Yellow','#e8d13a']], rules:'Bottom 8 rows of the well. No full row; 4+ filled cells; at most 70% filled.'},
+ {id:21,name:'REVERSI', w:8, h:8, def:0, t:[['Empty','#1f6b3a'],['Black','#111418'],['White','#f1f3f7'],['Block','#8c6a4a']], rules:'2+ black, 2+ white discs; Black must have an opening move.'},
+ {id:22,name:'GEM SWAP', w:8, h:8, def:6, t:[['Red','#d94141'],['Green','#3fbf6a'],['Blue','#4d7fff'],['Yellow','#e8d13a'],['Purple','#a85fe0'],['Orange','#f08a2c'],['Random','#5b6272']], rules:'4+ fixed gems; no 3-in-a-row at the start; if no Random tiles a legal swap must exist.'},
+ {id:23,name:'BUBBLE SHOOTER', w:10, h:8, def:0, t:[['Empty','#2d3340'],['Red','#d94141'],['Green','#3fbf6a'],['Blue','#4d7fff'],['Yellow','#e8d13a'],['Purple','#a85fe0']], rules:'10+ bubbles, every bubble connected to the ceiling (odd rows sit half a bubble to the right).'},
+ {id:24,name:'MASTERMIND', w:5, h:1, def:0, oneD:1, t:[['Empty','#2d3340'],['Red','#d94141'],['Green','#3fbf6a'],['Blue','#4d7fff'],['Yellow','#e8d13a'],['Purple','#a85fe0'],['Orange','#f08a2c'],['Cyan','#35c8d6'],['White','#f1f3f7']], rules:'Secret code, 5 pegs; the first 4 must be colours 1-8.'}
+];
+
+/* ---------------- helpers ---------------- */
+const cnt = (c, t) => { let n = 0; for (const r of c) for (const v of r) if (v === t) n++; return n; };
+const blank = (w, h, v) => Array.from({length:h}, () => Array(w).fill(v));
+const clone2 = c => c.map(r => r.slice());
+function nameFix(s) {            // lvlNameFix on every char; max 8; trailing spaces trimmed by the device
+  let o = '';
+  for (const ch of String(s)) {
+    if (/[A-Z0-9-]/.test(ch)) o += ch; else if (/[a-z]/.test(ch)) o += ch.toUpperCase(); else o += ' ';
+  }
+  return o;
+}
+const nameClean = (s, n) => nameFix(s).slice(0, n).replace(/ +$/, '');
+
+/* ---------------- solvers (ported from tools/verify_packs.py) ---------------- */
+function sokoSolve(w, h, cells, limit = 300000) {
+  const walls = new Set(), goals = new Set(); const boxes = []; let start = null;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const t = cells[y][x], k = x + y * 64;
+    if (t === 1) walls.add(k); else if (t === 3) goals.add(k); else if (t === 2) boxes.push(k); else if (t === 4) start = k;
+  }
+  if (boxes.every(b => goals.has(b))) return 0;
+  const key = (p, bx) => p + ':' + bx.join(',');
+  const b0 = boxes.slice().sort((a, b) => a - b);
+  const seen = new Set([key(start, b0)]);
+  let q = [[start, b0, 0]], qi = 0;
+  const D = [[1,0],[-1,0],[0,1],[0,-1]];
+  while (qi < q.length) {
+    const [p, bx, d] = q[qi++]; const px = p % 64, py = (p / 64) | 0;
+    for (const [dx, dy] of D) {
+      const nx = px + dx, ny = py + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h || walls.has(nx + ny * 64)) continue;
+      let nb = bx; const np = nx + ny * 64;
+      if (bx.includes(np)) {
+        const bnx = nx + dx, bny = ny + dy, bk = bnx + bny * 64;
+        if (bnx < 0 || bny < 0 || bnx >= w || bny >= h || walls.has(bk) || bx.includes(bk)) continue;
+        nb = bx.filter(b => b !== np).concat([bk]).sort((a, b) => a - b);
+        if (nb.every(b => goals.has(b))) return d + 1;
+      }
+      const k = key(np, nb);
+      if (!seen.has(k)) { seen.add(k); if (seen.size > limit) return null; q.push([np, nb, d + 1]); }
+    }
+  }
+  return null;
+}
+const QUIET = [[0x0E,0x15,0x1B,0x15,0x0E],[0x15,0x15,0x00,0x15,0x15]];
+function lightsParityOk(cells) {
+  for (const q of QUIET) { let par = 0;
+    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) if (((cells[r] || [])[c]) === 1 && (q[r] & (1 << c))) par ^= 1;
+    if (par) return false; }
+  return true;
+}
+function lightsMinPresses(cells) {
+  let target = 0n; const bit = i => 1n << BigInt(i);
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) if (cells[r][c] === 1) target |= bit(r * 5 + c);
+  const basis = []; const kernel = [];
+  for (let i = 0; i < 25; i++) {
+    const r = (i / 5) | 0, c = i % 5; let m = 0n;
+    for (const [rr, cc] of [[r,c],[r-1,c],[r+1,c],[r,c-1],[r,c+1]]) if (rr >= 0 && rr < 5 && cc >= 0 && cc < 5) m |= bit(rr * 5 + cc);
+    let v = m, p = bit(i);
+    for (const [bv, bp] of basis) if ((v ^ bv) < v) { v ^= bv; p ^= bp; }
+    if (v) { basis.push([v, p]); basis.sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0)); } else kernel.push(p);
+  }
+  let v = target, p = 0n;
+  for (const [bv, bp] of basis) if ((v ^ bv) < v) { v ^= bv; p ^= bp; }
+  if (v) return null;
+  let best = null;
+  for (let k = 0; k < (1 << kernel.length); k++) {
+    let pp = p; kernel.forEach((kv, j) => { if ((k >> j) & 1) pp ^= kv; });
+    let n = 0; for (let b = pp; b; b >>= 1n) if (b & 1n) n++;
+    if (best === null || n < best) best = n;
+  }
+  return best;
+}
+function floodGreedy(w, h, cells) {
+  const n = Math.min(w, h); const bd = cells.slice(0, n).map(r => r.slice(0, n));
+  const cs = new Set(); bd.forEach(r => r.forEach(v => cs.add(v % 6)));
+  const grow = (reg, colour) => {
+    const R = new Set(reg), st = [...reg];
+    while (st.length) { const k = st.pop(), x = k % 64, y = (k / 64) | 0;
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy, nk = nx + ny * 64;
+        if (nx >= 0 && ny >= 0 && nx < n && ny < n && !R.has(nk) && bd[ny][nx] % 6 === colour) { R.add(nk); st.push(nk); } } }
+    return R;
+  };
+  let cur = bd[0][0] % 6, region = grow(new Set([0]), cur), moves = 0;
+  while (region.size < n * n) {
+    let best = -1, bc = null;
+    for (let c = 0; c < 6; c++) { if (c === cur) continue; const g = grow(region, c).size; if (g > best) { best = g; bc = c; } }
+    region = grow(region, bc); cur = bc; moves++; if (moves > 200) return [null, cs.size];
+  }
+  return [moves, cs.size];
+}
+function mazePath(w, h, cells) {
+  let st = null, gl = null;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { if (cells[y][x] === 2) st = [x, y]; else if (cells[y][x] === 3) gl = [x, y]; }
+  if (!st || !gl) return null;
+  const seen = new Set([st[0] + st[1] * 64]); const q = [[st[0], st[1], 0]];
+  for (let i = 0; i < q.length; i++) { const [x, y, d] = q[i]; if (x === gl[0] && y === gl[1]) return d;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < w && ny < h && !seen.has(nx + ny * 64) && cells[ny][nx] !== 1) { seen.add(nx + ny * 64); q.push([nx, ny, d + 1]); } } }
+  return null;
+}
+function gemRunAt(bd, x, y) {
+  const g = bd[y][x]; if (g > 5) return false;
+  let c = 1, k = x - 1; while (k >= 0 && bd[y][k] === g) { c++; k--; }
+  k = x + 1; while (k < 8 && bd[y][k] === g) { c++; k++; }
+  if (c >= 3) return true;
+  c = 1; k = y - 1; while (k >= 0 && bd[k][x] === g) { c++; k--; }
+  k = y + 1; while (k < 8 && bd[k][x] === g) { c++; k++; }
+  return c >= 3;
+}
+function gemMoves(bd) {
+  let n = 0;
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) for (const [dx, dy] of [[1,0],[0,1]]) {
+    const nx = x + dx, ny = y + dy; if (nx > 7 || ny > 7) continue;
+    let t = bd[y][x]; bd[y][x] = bd[ny][nx]; bd[ny][nx] = t;
+    const ok = gemRunAt(bd, x, y) || gemRunAt(bd, nx, ny);
+    t = bd[y][x]; bd[y][x] = bd[ny][nx]; bd[ny][nx] = t;
+    if (ok) n++;
+  }
+  return n;
+}
+function bubNbr(r, c) {
+  const out = []; const sh = r & 1;
+  if (c > 0) out.push([r, c - 1]); if (c < 9) out.push([r, c + 1]);
+  for (const rr of [r - 1, r + 1]) { if (rr < 0 || rr >= 11) continue; const c0 = sh ? c : c - 1;
+    for (let j = 0; j < 2; j++) { const cc = c0 + j; if (cc >= 0 && cc < 10) out.push([rr, cc]); } }
+  return out;
+}
+function bubAnchoredOk(cells) {
+  const g = Array.from({length:11}, (_, r) => Array.from({length:10}, (_, c) => (cells[r] && cells[r][c] >= 1 && cells[r][c] <= 5) ? cells[r][c] : 0));
+  const seen = new Set(); const st = [];
+  for (let c = 0; c < 10; c++) if (g[0][c]) { seen.add(c); st.push([0, c]); }
+  while (st.length) { const [r, c] = st.pop();
+    for (const [rr, cc] of bubNbr(r, c)) if (g[rr][cc] && !seen.has(rr * 10 + cc)) { seen.add(rr * 10 + cc); st.push([rr, cc]); } }
+  for (let r = 0; r < 11; r++) for (let c = 0; c < 10; c++) if (g[r][c] && !seen.has(r * 10 + c)) return false;
+  return true;
+}
+const RV_DIRS = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];
+function revFlips(bd, x0, y0, p) {
+  if (bd[y0][x0] !== 0) return 0; let tot = 0; const q = 3 - p;
+  for (const [dx, dy] of RV_DIRS) { let x = x0 + dx, y = y0 + dy, n = 0;
+    while (x >= 0 && x < 8 && y >= 0 && y < 8 && bd[y][x] === q) { x += dx; y += dy; n++; }
+    if (n && x >= 0 && x < 8 && y >= 0 && y < 8 && bd[y][x] === p) tot += n; }
+  return tot;
+}
+const revMoves = (bd, p) => { let n = 0; for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) if (revFlips(bd, x, y, p)) n++; return n; };
+
+/* Cube Dash physics bot (port of cdStep, 1/120 s steps) */
+const CD_BASE = [95, 120, 75, 140], CD_RAMP = [0.022, 0.030, 0.016, 0.034];
+const CD_X0 = 240, CD_PITCH = 64, CD_GROUND = 100, CD_CUBE_X = 36;
+const CD_KIND = {1:[0,12], 2:[2,16], 3:[3,34], 4:[1,24]};
+function cubeObstacles(cells) {
+  const obs = []; let idx = 0;
+  for (const row of cells) for (const t of row) { if (CD_KIND[t]) { const [ty, w] = CD_KIND[t]; obs.push([CD_X0 + idx * CD_PITCH + 16, ty, w]); } idx++; }
+  return [obs, CD_X0 + idx * CD_PITCH + 90];
+}
+function cdStep(st, obs, tier, want) {
+  const hstep = 1 / 120; let [scroll, cy, vy, ground] = st;
+  scroll += Math.min(210, CD_BASE[tier] + CD_RAMP[tier] * scroll) * hstep;
+  const cxw = scroll + CD_CUBE_X; const prevBottom = cy + 12;
+  if (ground && want) { vy = -260; ground = false; }
+  vy += 800 * hstep; cy += vy * hstep;
+  const cc = cxw + 6;
+  const inPit = obs.some(([ox, ty, w]) => ty === 3 && ox <= cc && cc <= ox + w);
+  let surf = inPit ? 1e9 : CD_GROUND;
+  for (const [ox, ty] of obs) if (ty === 2 && cxw + 11 > ox && cxw + 1 < ox + 16) { const top = CD_GROUND - 14; if (prevBottom <= top + 4 && top < surf) surf = top; }
+  if (vy >= 0 && cy + 12 >= surf) { cy = surf - 12; vy = 0; ground = true; } else ground = false;
+  if (inPit && cy + 12 > CD_GROUND + 6) return null;
+  if (cy > 135) return null;
+  const hx0 = cxw + 2, hx1 = cxw + 10, hy0 = cy + 1, hy1 = cy + 11;
+  for (const [ox, ty, w] of obs) {
+    if (ty === 3) continue; let ox0, ox1, oy0;
+    if (ty === 2) { ox0 = ox; ox1 = ox + 16; oy0 = CD_GROUND - 14; } else { ox0 = ox + 3; ox1 = ox + w - 3; oy0 = CD_GROUND - 9; }
+    if (hx1 > ox0 && hx0 < ox1 && hy1 > oy0 && hy0 < CD_GROUND) return null;
+  }
+  return [scroll, cy, vy, ground];
+}
+function cubeBotOk(cells, tier) {
+  const [obs, finish] = cubeObstacles(cells); const cands = [24,20,28,16,32,12,36,8,40,4,48,56]; const dead = new Set();
+  const nextDist = st => { const cxw = st[0] + CD_CUBE_X; for (const [ox, ty, w] of obs) if (ox + w > cxw + 2) return ox - (cxw + 10); return null; };
+  const plan = (st, depth) => {
+    const key = st[0].toFixed(1) + ',' + st[1].toFixed(1);
+    if (dead.has(key) || depth > 400) return false;
+    for (const D of cands) {
+      let s = st, ok = true, done = false;
+      for (let i = 0; i < 20000; i++) {
+        if (s[0] + CD_CUBE_X >= finish) return true;
+        const nd = nextDist(s);
+        if (nd !== null && s[3] && nd <= D) { done = true; break; }
+        s = cdStep(s, obs, tier, false); if (!s) { ok = false; break; }
+      }
+      if (!ok || !done) continue;
+      s = cdStep(s, obs, tier, true);
+      for (let i = 0; i < 20000; i++) {
+        if (!s) break; if (s[0] + CD_CUBE_X >= finish) return true; if (s[3]) break;
+        s = cdStep(s, obs, tier, false);
+      }
+      if (!s) continue;
+      if (plan(s, depth + 1)) return true;
+    }
+    dead.add(key); return false;
+  };
+  return plan([0, CD_GROUND - 12, 0, true], 0);
+}
+
+/* ---------------- per-game validators: E = the device refuses the level, W = pack-quality extras ---------------- */
+const R = {
+ 0(w,h,c,E,W){ const b=cnt(c,2),g=cnt(c,3),s=cnt(c,4);
+   if(s!==1)E.push('Need exactly 1 Start'); if(b<1||b>2)E.push('Need 1-2 boxes'); if(g!==b)E.push('Goals must match boxes');
+   if(!E.length){ const n=sokoSolve(w,h,c); if(n===null)W.push('Not solvable (BFS)'); else return 'shortest solution: '+n+' moves'; } },
+ 1(w,h,c,E){ if(cnt(c,3)!==1)E.push('Need exactly 1 Start'); if(cnt(c,2)!==1)E.push('Need exactly 1 Goal'); if(cnt(c,1)>6)E.push('Max 6 holes'); },
+ 2(w,h,c,E){ if(cnt(c,1)<1)E.push('Need at least 1 brick'); },
+ 3(w,h,c,E){ if(c[0].filter(v=>v===3).length!==1)E.push('Need exactly 1 Finish'); if(c[0][0]!==0)E.push('First cell must be Safe'); },
+ 4(w,h,c,E,W){ if(cnt(c,2)!==1)E.push('Need exactly 1 Start'); if(cnt(c,3)!==1)E.push('Need exactly 1 Goal');
+   if(!E.length){ const d=mazePath(w,h,c); if(d===null)E.push('Goal not reachable');
+     let b=true; for(let x=0;x<w;x++) if(c[0][x]!==1||c[h-1][x]!==1)b=false; for(let y=0;y<h;y++) if(c[y][0]!==1||c[y][w-1]!==1)b=false;
+     if(!b)W.push('Border is not all wall (packs require it)'); if(d!==null)return 'shortest path: '+d; } },
+ 5(w,h,c,E){ if(cnt(c,1)<1)E.push('Need at least 1 enemy'); },
+ 6(w,h,c,E){ const n=cnt(c,1); if(n<1)E.push('Need at least 1 wall'); if(n>24)E.push('Max 24 wall blocks');
+   for(let x=3;x<=7;x++) if(c[3]&&c[3][x]===1){E.push('Keep middle row clear');break;} },
+ 7(w,h,c,E){ const n=cnt(c,1); if(n<1)E.push('Need at least 1 block'); if(n>14)E.push('Max 14 blocks');
+   if(c.some(r=>r[0]===1||r[w-1]===1))E.push('Keep left/right col clear'); if(c[3]&&c[3][5]===1)E.push('Keep center clear'); },
+ 8(w,h,c,E){ const n=cnt(c,1); if(n<1)E.push('Need at least 1 mine'); if(n>w*h-9)E.push('Too many mines'); },
+ 9(w,h,c,E,W){ const [mv,cols]=floodGreedy(w,h,c); if(cols<2){E.push('Use at least 2 colours');return;}
+   const n=Math.min(w,h), limit=((cols*n/2)|0)+2; if(mv===null||mv>limit)W.push('Greedy needs '+mv+' > in-game move limit '+limit); else return 'greedy '+mv+' moves, limit '+limit; },
+ 10(w,h,c,E){ if(w*h-cnt(c,0)<3)E.push('Need 3+ obstacles'); },
+ 11(w,h,c,E){ if(cnt(c,1)<8)E.push('Need at least 8 notes'); },
+ 12(w,h,c,E){ let runs=0,a=0,b=0; for(let x=0;x<w;x++){ if(c[0][x]!==9)continue; if(x===0||c[0][x-1]!==9){runs++;a=x;} b=x+1; }
+   if(cnt(c,9)===0)E.push('Place a landing pad'); else if(runs!==1)E.push('Only one pad allowed'); else if(b-a<3)E.push('Pad needs 3+ columns'); },
+ 13(w,h,c,E){ if(cnt(c,1)<1)E.push('Turn some lights on'); else if(!lightsParityOk(c))E.push('Unsolvable pattern');
+   else{ const m=lightsMinPresses(c); return m===null?null:'fewest presses: '+m; } },
+ 14(w,h,c,E){ const ps=cnt(c,3),gs=cnt(c,4); if(ps!==1)E.push('Need 1 player start'); if(gs!==1)E.push('Need 1 ghost start'); const dots=cnt(c,1);
+   if(dots<10)E.push('Need at least 10 dots'); if(E.length)return; let px,py,gx,gy;
+   c.forEach((r,y)=>r.forEach((v,x)=>{ if(v===3){px=x;py=y;} if(v===4){gx=x;gy=y;} }));
+   if(Math.abs(gx-px)+Math.abs(gy-py)<=3||Math.abs((19-gx)-px)+Math.abs(gy-py)<=3)E.push('Ghost too near start');
+   const seen=new Set([px+py*64]),q=[[px,py]]; let got=0;
+   for(let i=0;i<q.length;i++){ const [x,y]=q[i]; if(c[y][x]===1)got++;
+     for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx=x+dx,ny=y+dy; if(nx<0||ny<0||nx>=w||ny>=h||seen.has(nx+ny*64)||c[ny][nx]===0)continue; seen.add(nx+ny*64); q.push([nx,ny]); } }
+   if(got<dots)E.push('Some dots unreachable'); },
+ 15(w,h,c,E){ if(cnt(c,1)+cnt(c,2)<10)E.push('Need at least 10 pegs'); },
+ 16(w,h,c,E){ if(Math.max(...c[0])===Math.min(...c[0]))E.push('Add some hills'); },
+ 17(w,h,c,E){ const n=cnt(c,1); if(n<1)E.push('Need at least 1 block'); if(n>16)E.push('Max 16 blocks');
+   if(c.some(r=>r[0]===1||r[w-1]===1))E.push('Keep goal columns clear'); if(h>3&&w>5&&(c[3][4]===1||c[3][5]===1))E.push('Keep center clear'); },
+ 18(w,h,c,E){ if(w<5)E.push('Need at least 5 walls'); if(c[0].some(v=>v>6))E.push('Bad gap height'); },
+ 19(w,h,c,E){ if(w<9)E.push('Need all 9 lanes'); else{ if(c[0][0]!==0||c[0][8]!==0)E.push('Start and goal: Safe'); if(c[0].slice(0,9).filter(v=>v!==0).length<2)E.push('Need 2+ hazard lanes'); } },
+ 20(w,h,c,E){ let filled=0; for(let r=0;r<h;r++){ const f=c[r].filter(v=>v).length; if(f>=w){E.push('Row '+(r+1)+' is full');} filled+=f; }
+   if(filled<4)E.push('Add some garbage'); if(filled*10>w*h*7)E.push('Over 70% filled'); },
+ 21(w,h,c,E){ const bd=Array.from({length:8},(_,y)=>Array.from({length:8},(_,x)=>{ const t=(y<h&&x<w)?c[y][x]:0; return t>3?0:t; }));
+   const nb=cnt(bd,1),nw=cnt(bd,2); if(nb<2)E.push('Need 2+ black discs'); if(nw<2)E.push('Need 2+ white discs'); if(nb>=2&&nw>=2&&revMoves(bd,1)===0)E.push('Black has no opening move'); },
+ 22(w,h,c,E){ const bd=Array.from({length:8},(_,y)=>Array.from({length:8},(_,x)=>(y<h&&x<w)?c[y][x]:6)); let nf=0,nr=0;
+   const gb=bd.map(r=>r.map(v=>{ if(v<6){nf++;return v;} nr++;return 7; }));
+   if(nf<4)E.push('Place some gems'); let run=false; for(let y=0;y<8&&!run;y++)for(let x=0;x<8;x++)if(gemRunAt(gb,x,y)){run=true;break;}
+   if(run)E.push('3 in a row at start'); else if(nr===0&&gemMoves(gb)===0)E.push('No legal swap'); },
+ 23(w,h,c,E){ let n=0; for(let r=0;r<8&&r<h;r++)for(let x=0;x<10&&x<w;x++) if(c[r][x]>=1&&c[r][x]<=5)n++;
+   if(n<10)E.push('Need at least 10 bubbles'); else if(!bubAnchoredOk(c))E.push('Bubble not on ceiling'); },
+ 24(w,h,c,E){ for(let i=0;i<4;i++) if(i>=w||c[0][i]<1||c[0][i]>8){E.push('Fill the first 4 pegs');break;} }
+};
+/* returns {err:[], warn:[], info:''} */
+function validate(id, w, h, cells) {
+  const g = G[id], err = [], warn = []; let info = '';
+  if (!(w >= 1 && h >= 1 && w <= g.w && h <= g.h)) { err.push('Size ' + w + 'x' + h + ' must fit 1..' + g.w + ' x 1..' + g.h); return {err, warn, info}; }
+  if (cells.length !== h || cells.some(r => r.length !== w)) { err.push('Cell grid does not match w x h'); return {err, warn, info}; }
+  if (cells.some(r => r.some(v => !(v >= 0 && v < g.t.length)))) { err.push('Tile id out of range 0..' + (g.t.length - 1) + ' (the device would silently replace it with tile ' + g.def + ')'); return {err, warn, info}; }
+  const r = R[id](w, h, cells, err, warn); if (r) info = r;
+  return {err, warn, info};
+}
+function deepCheck(id, w, h, cells) {   // slow extra checks (Cube Dash bot at the four speed tiers)
+  if (id !== 10) return [];
+  const out = []; for (let t = 0; t < 4; t++) if (!cubeBotOk(cells, t)) out.push('Cube bot cannot finish at speed tier ' + (t + 1) + ' (packs require all four)');
+  return out;
+}
+
+/* ---------------- slot files  /levels/g<G>s<S>a.lvl  (format v4, 0xA8) ---------------- */
+function lvlChk(b, n) { let c = 0x5A; for (let i = 0; i < n; i++) c = (((c << 1) | (c >> 7)) & 0xFF) ^ b[i]; return c; }
+function slotBuild(gid, lv, gen) {
+  const w = lv.w, h = lv.h, n = 16 + w * h + 2, b = new Uint8Array(n);
+  b[0] = 0xA8; b[1] = (gid & 0x7F) | (lv.verified ? 0x80 : 0); b[2] = w; b[3] = h;
+  const nm = nameFix(lv.name || '').slice(0, 8).padEnd(8, ' ');
+  for (let i = 0; i < 8; i++) b[4 + i] = nm.charCodeAt(i);
+  const best = (lv.best === undefined ? NO_BEST : lv.best) >>> 0;
+  b[12] = best & 255; b[13] = (best >>> 8) & 255; b[14] = (best >>> 16) & 255; b[15] = (best >>> 24) & 255;
+  let k = 16; for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) b[k++] = lv.cells[r][c];
+  b[k] = gen || 1; b[k + 1] = lvlChk(b, k + 1);
+  return b;
+}
+/* -> {game, lv, ver, gen} or {error} ; accepts v1..v4 exactly like lvlRawOk/lvlDeserialize */
+function slotParse(b) {
+  const n = b.length; if (n < 4) return {error:'too short'};
+  const m = b[0], w = b[2], h = b[3]; if (w < 1 || h < 1) return {error:'bad size'};
+  const gid = b[1] & 0x7F; if (gid >= G.length) return {error:'unknown game id ' + gid};
+  let off, gen = 0, ver, named = true;
+  if (m === 0xA8) { if (w > 24 || h > 16 || n !== 16 + w * h + 2 || b[n - 1] !== lvlChk(b, n - 1)) return {error:'bad v4 size/checksum'}; gen = b[n - 2]; if (!gen) return {error:'generation 0'}; off = 16; ver = 4; }
+  else if (m === 0xA7) { if (w > 24 || h > 16 || n !== 16 + w * h) return {error:'bad v3 size'}; off = 16; ver = 3; }
+  else if (m === 0xA6) { if (w > 24 || h > 16 || n !== 4 + w * h) return {error:'bad v2 size'}; off = 4; ver = 2; named = false; }
+  else if (m === 0xA5) { if (n !== 94 || w > 10 || h > 9) return {error:'bad v1 size'}; off = 4; ver = 1; named = false; }
+  else return {error:'not a level file (magic 0x' + m.toString(16) + ')'};
+  const stride = ver === 1 ? 10 : w;
+  const cells = []; for (let r = 0; r < h; r++) { const row = []; for (let c = 0; c < w; c++) row.push(b[off + r * stride + c]); cells.push(row); }
+  const lv = {name:'', par:5, w, h, cells, verified:(ver >= 2 ? (b[1] >> 7) : 0) ? true : false, best:NO_BEST};
+  if (named) { let s = ''; for (let i = 0; i < 8; i++) s += nameFix(String.fromCharCode(b[4 + i])); lv.name = s.replace(/ +$/, ''); lv.best = (b[12] | (b[13] << 8) | (b[14] << 16) | (b[15] << 24)) | 0; }
+  return {game:gid, lv, ver, gen};
+}
+
+/* ---------------- level packs  /packs/g<G>.pak ---------------- */
+function packSize(levels) { let n = 20; for (const l of levels) n += 11 + l.w * l.h; return n; }
+function packBuild(gid, title, levels) {
+  const n = packSize(levels), b = new Uint8Array(n);
+  b.set([0x41,0x52,0x50,0x4B,1,gid,levels.length,0]);
+  const t = String(title || '').toUpperCase().padEnd(12, ' ').slice(0, 12); for (let i = 0; i < 12; i++) b[8 + i] = t.charCodeAt(i) & 127;
+  let p = 20;
+  for (const l of levels) {
+    b[p] = l.w; b[p + 1] = l.h;
+    const nm = nameFix(l.name || '').slice(0, 8).padEnd(8, ' '); for (let i = 0; i < 8; i++) b[p + 2 + i] = nm.charCodeAt(i);
+    b[p + 10] = l.par || 5; p += 11;
+    for (let r = 0; r < l.h; r++) for (let c = 0; c < l.w; c++) b[p++] = l.cells[r][c];
+  }
+  return b;
+}
+function packParse(b) {
+  if (b.length < 20 || String.fromCharCode(b[0], b[1], b[2], b[3]) !== 'ARPK') return {error:'bad magic'};
+  if (b[4] !== 1) return {error:'bad version'};
+  const gid = b[5], cnt_ = b[6]; if (gid >= G.length) return {error:'unknown game id ' + gid};
+  if (cnt_ < 1 || cnt_ > 60) return {error:'bad count'}; if (b.length > 20480) return {error:'file larger than 20480 bytes'};
+  let title = ''; for (let i = 8; i < 20; i++) title += String.fromCharCode(b[i]); title = title.replace(/ +$/, '');
+  const g = G[gid]; const levels = []; let p = 20; let warn = '';
+  for (let i = 0; i < cnt_; i++) {
+    if (p + 11 > b.length) { warn = 'record ' + i + ' truncated'; break; }
+    const w = b[p], h = b[p + 1];
+    if (!(w >= 1 && h >= 1 && w <= g.w && h <= g.h)) { warn = 'record ' + i + ' bad size'; break; }
+    if (p + 11 + w * h > b.length) { warn = 'record ' + i + ' truncated'; break; }
+    let nm = ''; for (let k = 0; k < 8; k++) nm += String.fromCharCode(b[p + 2 + k]);
+    const par = b[p + 10]; const cells = []; let q = p + 11;
+    for (let r = 0; r < h; r++) { const row = []; for (let c = 0; c < w; c++) row.push(b[q++]); cells.push(row); }
+    levels.push({name:nameFix(nm).replace(/ +$/, ''), par, w, h, cells}); p = q;
+  }
+  if (!warn && p !== b.length) warn = (b.length - p) + ' trailing bytes';
+  return {game:gid, title, levels, warn};
+}
+
+/* ---------------- Portal hand-made levels  /packs/portal.lvl  (ARPL) ---------------- */
+const PORTAL_REC = 16 + 40 * 40;
+const PORTAL_TILES = [
+ ['#','Wall','#8c6a4a'],['N','No-portal wall','#5a4636'],['.','Floor','#2d3340'],['~','Pit','#05060a'],['I','Ice','#8fd4f0'],['S','Start','#4da3ff'],['G','Goal','#3fbf6a'],
+ ['X','Box','#d6a53c'],['P','Plate','#e8793a'],['D','Door','#a85fe0'],['^','Emitter up','#d94141'],['v','Emitter down','#d94141'],['<','Emitter left','#d94141'],['>','Emitter right','#d94141'],
+ ['Y','Key','#e8d13a'],['K','Locked door','#a07a1c'],['u','Belt up','#556b8c'],['d','Belt down','#556b8c'],['l','Belt left','#556b8c'],['r','Belt right','#556b8c'],
+ ['F','Boost','#f08a2c'],['M','Mud','#6b4a2a'],['T','Teleporter A','#35c8d6'],['U','Teleporter B','#d835c8']
+];
+const PORTAL_VALID = new Set(PORTAL_TILES.map(t => t[0]));
+function portalValidate(lv) {
+  const err = [], warn = [], h = lv.h, w = lv.w;
+  if (!(w >= 1 && w <= 40 && h >= 1 && h <= 40)) err.push('Size ' + w + 'x' + h + ' must be 1..40 each');
+  let s = 0, g = 0; for (const r of lv.cells) for (const ch of r) { if (!PORTAL_VALID.has(ch)) { err.push('Bad tile ' + JSON.stringify(ch)); break; } if (ch === 'S') s++; if (ch === 'G') g++; }
+  if (s !== 1) err.push('Needs exactly one S (found ' + s + ')');
+  if (g > 1) err.push('At most one G (found ' + g + ')'); if (g === 0) warn.push('No goal (sandbox level)');
+  if (!/^[A-Z0-9 -]{0,12}$/.test(lv.name)) err.push('Name: A-Z 0-9 space - (max 12)');
+  return {err, warn};
+}
+function portalBuild(levels) {
+  const out = new Uint8Array(8 + levels.length * PORTAL_REC);
+  out.set([0x41,0x52,0x50,0x4C,1,levels.length & 255,(levels.length >> 8) & 255,0]);
+  levels.forEach((lv, i) => { const o = 8 + i * PORTAL_REC; out[o] = lv.w; out[o + 1] = lv.h;
+    const nm = String(lv.name).toUpperCase().padEnd(12, ' ').slice(0, 12); for (let k = 0; k < 12; k++) out[o + 2 + k] = nm.charCodeAt(k);
+    for (let r = 0; r < lv.h; r++) for (let c = 0; c < lv.w; c++) out[o + 16 + r * lv.w + c] = lv.cells[r][c].charCodeAt(0); });
+  return out;
+}
+function portalParse(b) {
+  if (b.length < 8 || String.fromCharCode(b[0], b[1], b[2], b[3]) !== 'ARPL' || b[4] !== 1) return {error:'not a portal.lvl (ARPL v1)'};
+  const n = b[5] | (b[6] << 8); if (b.length !== 8 + n * PORTAL_REC) return {error:'size does not match count'};
+  const levels = [];
+  for (let i = 0; i < n; i++) { const o = 8 + i * PORTAL_REC, w = b[o], h = b[o + 1];
+    if (!(w >= 1 && h >= 1 && w <= 40 && h <= 40)) return {error:'record ' + i + ' bad size'};
+    let nm = ''; for (let k = 0; k < 12; k++) nm += String.fromCharCode(b[o + 2 + k]); nm = nm.replace(/[ \0]+$/, '');
+    const cells = []; for (let r = 0; r < h; r++) { const row = []; for (let c = 0; c < w; c++) row.push(String.fromCharCode(b[o + 16 + r * w + c])); cells.push(row); }
+    levels.push({name:nm, w, h, cells}); }
+  return {levels};
+}
+const PORTAL_TXT_HEAD = "# Portal levels. One block per level: a '# name' line (max 12 chars, A-Z 0-9 space -), then the rows.\n" +
+ "# Blank line between levels. Tile letters: # wall, N no-portal wall, . floor, ~ pit, I ice, S start, G goal,\n" +
+ "# X box, P plate, D door, ^v<> emitters, Y key, K locked door, u d l r conveyors, F boost, M mud, T/U teleporters.\n" +
+ "# Level numbers = order in this file (1-based). Never reorder/delete existing ones: append only.\n\n";
+function portalTxtBuild(levels) { return PORTAL_TXT_HEAD + levels.map(l => '# ' + l.name + '\n' + l.cells.map(r => r.join('')).join('\n') + '\n').join('\n'); }
+function portalTxtParse(text) {       // same rules as make_portal_pack.py parse()
+  const levels = []; let name = null, rows = [];
+  const flush = () => { if (name !== null && rows.length) levels.push([name, rows.slice()]); };
+  for (let ln of text.split('\n')) {
+    ln = ln.replace(/\r$/, '');
+    if (ln.startsWith('# ')) {
+      if (rows.length) { flush(); rows = []; name = null; }
+      const cand = ln.slice(2).trim();
+      if (cand && /^[A-Za-z0-9 -]+$/.test(cand) && cand.length <= 12 && !cand.startsWith('Portal')) name = cand.toUpperCase();
+    } else if (ln.trim() === '') { if (rows.length) { flush(); rows = []; name = null; } }
+    else if (name !== null) rows.push(ln);
+  }
+  if (rows.length) flush();
+  return levels.map(([name, rows]) => { const w = Math.max(...rows.map(r => r.length)); return {name, w, h:rows.length, cells:rows.map(r => r.padEnd(w, '.').split(''))}; });
+}
+
+/* ---------------- Portal Quest world  /worlds/quest.wld  (ARQW) ---------------- */
+const QUEST_TILES = PORTAL_TILES.filter(t => !'SGY'.includes(t[0]));
+const QUEST_VALID = new Set(QUEST_TILES.map(t => t[0]));
+const QUEST_THEMES = ['Town','Ice','Factory','Temple','Maze','Swamp','Vault','Caves'];
+const QOBJ = [null,'Crystal','Key','Locked door','Sign','Checkpoint','Teleport pad','Secret wall','Crystal gate','Win diamond','NPC'];
+const QBLOCK = new Set('#N~^v<>'), QCONV = {u:[-1,0], d:[1,0], l:[0,-1], r:[0,1]};
+const DV4 = [[-1,0],[1,0],[0,-1],[0,1]];
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function questRegionBlob(rg) {
+  const strs = rg.strs.map(s => { const a = [s.length]; for (const ch of s) a.push(ch.charCodeAt(0) & 255); return a; });
+  const sb = strs.reduce((n, a) => n + a.length, 0);
+  const out = new Uint8Array(8 + rg.objs.length * 8 + sb + rg.w * rg.h);
+  out[0] = rg.w; out[1] = rg.h; out[2] = rg.objs.length; out[3] = rg.strs.length; out[4] = sb & 255; out[5] = sb >> 8;
+  let p = 8; for (const o of rg.objs) { out.set([o.type, o.col, o.row, o.flag, o.a, o.b, o.c, o.d], p); p += 8; }
+  for (const a of strs) { out.set(a, p); p += a.length; }
+  for (let r = 0; r < rg.h; r++) for (let c = 0; c < rg.w; c++) out[p++] = rg.cells[r][c].charCodeAt(0);
+  return out;
+}
+function questBuild(q) {
+  const n = q.W * q.H; const blobs = [];
+  for (let i = 0; i < n; i++) blobs.push(q.regions[i] ? questRegionBlob(q.regions[i]) : null);
+  const bodyLen = blobs.reduce((s, b) => s + (b ? b.length : 0), 0), idxEnd = 32 + n * 8;
+  const out = new Uint8Array(idxEnd + bodyLen); let off = idxEnd;
+  const body = new Uint8Array(bodyLen); let bp = 0;
+  for (const b of blobs) if (b) { body.set(b, bp); bp += b.length; }
+  const wid = crc32(body);
+  out.set([0x41,0x52,0x51,0x57,1,q.W,q.H,q.regions.filter(Boolean).length], 0);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(8, wid, true); dv.setUint16(12, q.crystalTotal, true); dv.setUint16(14, q.crystalNeed, true);
+  out[16] = q.startRegion; out[17] = q.startCol; out[18] = q.startRow; out[19] = 0;
+  const nm = String(q.name || '').slice(0, 12); for (let i = 0; i < nm.length; i++) out[20 + i] = nm.charCodeAt(i) & 127;
+  for (let i = 0; i < n; i++) { const e = 32 + i * 8;
+    if (blobs[i]) { dv.setUint32(e, off, true); dv.setUint16(e + 4, blobs[i].length, true); out[e + 6] = q.regions[i].theme; out.set(blobs[i], off); off += blobs[i].length; } }
+  return out;
+}
+function questParse(b) {
+  if (b.length < 32 || String.fromCharCode(b[0], b[1], b[2], b[3]) !== 'ARQW' || b[4] !== 1) return {error:'not a quest.wld (ARQW v1)'};
+  const W = b[5], H = b[6]; if (W < 1 || W > 8 || H < 1 || H > 8 || b.length < 32 + W * H * 8) return {error:'bad world size'};
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  let name = ''; for (let i = 20; i < 32; i++) { if (!b[i]) break; name += String.fromCharCode(b[i]); }
+  const q = {W, H, name, crystalTotal:dv.getUint16(12, true), crystalNeed:dv.getUint16(14, true), startRegion:b[16], startCol:b[17], startRow:b[18], regions:[]};
+  for (let i = 0; i < W * H; i++) {
+    const e = 32 + i * 8, off = dv.getUint32(e, true), len = dv.getUint16(e + 4, true), th = b[e + 6];
+    if (!len) { q.regions.push(null); continue; }
+    if (off + len > b.length) return {error:'region ' + i + ' outside file'};
+    const rw = b[off], rh = b[off + 1], no = b[off + 2], ns = b[off + 3], sb = b[off + 4] | (b[off + 5] << 8);
+    if (!(rw >= 1 && rh >= 1 && rw <= 40 && rh <= 40) || no > 28 || ns > 12 || sb > 360 || len !== 8 + no * 8 + sb + rw * rh) return {error:'region ' + i + ' header invalid'};
+    const objs = []; let p = off + 8;
+    for (let k = 0; k < no; k++) { objs.push({type:b[p], col:b[p+1], row:b[p+2], flag:b[p+3], a:b[p+4], b:b[p+5], c:b[p+6], d:b[p+7]}); p += 8; }
+    const strs = []; for (let k = 0; k < ns; k++) { const l = b[p++]; let s = ''; for (let j = 0; j < l; j++) s += String.fromCharCode(b[p++]); strs.push(s); }
+    const cells = []; for (let r = 0; r < rh; r++) { const row = []; for (let c = 0; c < rw; c++) row.push(String.fromCharCode(b[p++])); cells.push(row); }
+    q.regions.push({theme:th, w:rw, h:rh, objs, strs, cells});
+  }
+  return {q};
+}
+/* world validator: format rules (E) + the checks make_quest_world.py applies (E/W) + an exploration like its validator */
+function questValidate(q) {
+  const E = [], Wn = [], I = [];
+  const regs = q.regions.map((r, i) => r ? Object.assign({id:i, x:i % q.W, y:(i / q.W) | 0}, r) : null).filter(Boolean);
+  const nm = r => '(' + r.x + ',' + r.y + ')';
+  if (q.W < 1 || q.W > 8 || q.H < 1 || q.H > 8) E.push('World size must be 1..8 x 1..8');
+  if (!regs.length) { E.push('No regions'); return {E, W:Wn, I}; }
+  if (regs.length > 64) E.push('More than 64 regions');
+  if (q.crystalTotal > 250) E.push('crystalTotal > 250');
+  const start = q.regions[q.startRegion];
+  if (!start) E.push('Start region does not exist'); else if (q.startCol >= start.w || q.startRow >= start.h || QBLOCK.has(start.cells[q.startRow][q.startCol])) E.push('Start tile is blocked or outside the region');
+  let crystals = 0; const flagsSeen = new Set(); const dupFlag = [];
+  for (const r of regs) {
+    if (r.w < 1 || r.h < 1 || r.w > 40 || r.h > 40) E.push('Region ' + nm(r) + ' size must be 1..40');
+    if (r.objs.length > 28) E.push('Region ' + nm(r) + ': more than 28 objects');
+    if (r.strs.length > 12) E.push('Region ' + nm(r) + ': more than 12 strings');
+    const sb = r.strs.reduce((n, s) => n + 1 + s.length, 0); if (sb > 360) E.push('Region ' + nm(r) + ': strings use ' + sb + ' > 360 bytes');
+    if (r.strs.some(s => s.length > 255 || /[^\x20-\x7e]/.test(s))) E.push('Region ' + nm(r) + ': strings must be printable ASCII');
+    for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) if (!QUEST_VALID.has(r.cells[y][x])) { E.push('Region ' + nm(r) + ': bad tile ' + JSON.stringify(r.cells[y][x]) + ' at ' + x + ',' + y + ' (S, G, Y are not allowed; use objects)'); y = r.h; break; }
+    let lasers = 0, crates = 0; for (const row of r.cells) for (const ch of row) { if ('^v<>'.includes(ch)) lasers++; if (ch === 'X') crates++; }
+    if (lasers > 2) Wn.push('Region ' + nm(r) + ': ' + lasers + ' laser emitters (only 2 are used)'); if (crates > 3) Wn.push('Region ' + nm(r) + ': ' + crates + ' crates (only 3 are used)');
+    const occ = new Set();
+    for (const o of r.objs) {
+      const where = 'Region ' + nm(r) + ' object ' + (QOBJ[o.type] || o.type) + ' at ' + o.col + ',' + o.row;
+      if (o.type < 1 || o.type > 10) { E.push(where + ': unknown type'); continue; }
+      if (o.col >= r.w || o.row >= r.h) { E.push(where + ': outside the region'); continue; }
+      const k = o.col + ',' + o.row; if (occ.has(k)) Wn.push(where + ': two objects on one tile'); occ.add(k);
+      const t = r.cells[o.row][o.col];
+      if (o.type === 3 && t !== 'K') Wn.push(where + ': locked door needs a K tile');
+      if (o.type === 7 && t !== '#') Wn.push(where + ': secret wall needs a # tile');
+      if (o.type === 8 && t !== 'N') Wn.push(where + ': crystal gate needs an N tile');
+      if (![3,7,8].includes(o.type) && QBLOCK.has(t)) Wn.push(where + ': object sits in a wall');
+      if (o.type === 1) { crystals++; if (o.flag >= q.crystalTotal) E.push(where + ': crystal flag ' + o.flag + ' >= crystalTotal'); else if (flagsSeen.has(o.flag)) dupFlag.push(o.flag); flagsSeen.add(o.flag); }
+      if ((o.type === 4 || o.type === 10) && o.a >= r.strs.length) E.push(where + ': string index ' + o.a + ' does not exist');
+      if (o.type === 6) { const d = q.regions[o.a]; if (!d) E.push(where + ': destination region ' + o.a + ' does not exist'); else if (o.b >= d.w || o.c >= d.h || QBLOCK.has(d.cells[o.c][o.b])) E.push(where + ': destination tile blocked'); }
+    }
+  }
+  if (dupFlag.length) E.push('Crystal flags used twice: ' + [...new Set(dupFlag)].join(','));
+  if (crystals !== q.crystalTotal) E.push('crystalTotal is ' + q.crystalTotal + ' but ' + crystals + ' crystal objects exist (flags must be 0..total-1)');
+  else for (let f = 0; f < q.crystalTotal; f++) if (!flagsSeen.has(f)) { E.push('Crystal flag ' + f + ' is not used'); break; }
+  if (q.crystalNeed > q.crystalTotal) Wn.push('crystalNeed > crystalTotal');
+  // doorways: facing outer-ring tiles must both be open (or both closed)
+  const open = (r, x, y) => !QBLOCK.has(r.cells[y][x]) && r.cells[y][x] !== 'K';
+  for (const r of regs) {
+    if (r.x + 1 < q.W && q.regions[r.id + 1]) { const n = q.regions[r.id + 1];
+      for (let y = 0; y < Math.max(r.h, n.h); y++) { const a = y < r.h && open(r, r.w - 1, y), b = y < n.h && open(n, 0, y); if (a !== b) { Wn.push('Doorway mismatch between ' + nm(r) + ' east edge and its neighbour at row ' + y); break; } } }
+    if (r.y + 1 < q.H && q.regions[r.id + q.W]) { const n = q.regions[r.id + q.W];
+      for (let x = 0; x < Math.max(r.w, n.w); x++) { const a = x < r.w && open(r, x, r.h - 1), b = x < n.w && open(n, x, 0); if (a !== b) { Wn.push('Doorway mismatch between ' + nm(r) + ' south edge and its neighbour at column ' + x); break; } } }
+    const lone = (side) => { // open edge tiles pointing at a missing neighbour
+      if (side === 'E') return r.x + 1 >= q.W || !q.regions[r.id + 1]; if (side === 'W') return r.x === 0 || !q.regions[r.id - 1];
+      if (side === 'S') return r.y + 1 >= q.H || !q.regions[r.id + q.W]; return r.y === 0 || !q.regions[r.id - q.W]; };
+    let dead = false; for (let y = 0; y < r.h; y++) { if (lone('W') && open(r, 0, y) && r.cells[y][0] !== '.' ) {} }
+    for (let y = 0; y < r.h && !dead; y++) { if ((lone('W') && open(r, 0, y)) || (lone('E') && open(r, r.w - 1, y))) dead = true; }
+    for (let x = 0; x < r.w && !dead; x++) { if ((lone('N') && open(r, x, 0)) || (lone('S') && open(r, x, r.h - 1))) dead = true; }
+    if (dead) Wn.push('Region ' + nm(r) + ' has an open edge tile with no neighbouring region (walking out would fail)');
+  }
+  // exploration (port of validate_world/explore)
+  const byid = {}; regs.forEach(r => byid[r.id] = r);
+  const objat = new Map(); const locks = new Map();
+  for (const r of regs) for (const o of r.objs) { objat.set(r.id + ',' + o.row + ',' + o.col, o); if (o.type === 3) { if (!locks.has(o.flag)) locks.set(o.flag, []); locks.get(o.flag).push([r.id, o.row, o.col]); } }
+  if (start && !E.length) {
+    const explore = (openCells, nCr) => {
+      const passable = (rid, r, c) => { const t = byid[rid].cells[r][c], o = objat.get(rid + ',' + r + ',' + c);
+        if (o && o.type === 8) return nCr >= o.a; if (o && o.type === 7) return true; if (t === 'K') return openCells.has(rid + ',' + r + ',' + c); return !QBLOCK.has(t); };
+      const seen = new Set(), reach = new Set(), qu = [];
+      const stop = p => { if (!reach.has(p)) touch(p); if (!seen.has(p)) { seen.add(p); qu.push(p); } };
+      const touch = p => { reach.add(p); const o = objat.get(p); if (o && o.type === 6 && byid[o.a]) stop(o.a + ',' + o.c + ',' + o.b); };
+      stop(q.startRegion + ',' + q.startRow + ',' + q.startCol);
+      for (let qi = 0; qi < qu.length; qi++) {
+        const [rid, r, c] = qu[qi].split(',').map(Number); const rg = byid[rid], g = rg.cells;
+        for (const d of DV4) {
+          let nr = r + d[0], nc = c + d[1];
+          if (nr < 0 || nc < 0 || nr >= rg.h || nc >= rg.w) {
+            const nx = (rid % q.W) + d[1], ny = ((rid / q.W) | 0) + d[0];
+            if (nx < 0 || ny < 0 || nx >= q.W || ny >= q.H || !byid[ny * q.W + nx]) continue;
+            const nid = ny * q.W + nx, n = byid[nid];
+            const tr = d[0] > 0 ? 0 : d[0] < 0 ? n.h - 1 : Math.min(r, n.h - 1), tc = d[1] > 0 ? 0 : d[1] < 0 ? n.w - 1 : Math.min(c, n.w - 1);
+            if (passable(nid, tr, tc)) stop(nid + ',' + tr + ',' + tc); continue; }
+          if (!passable(rid, nr, nc)) continue;
+          let pr = nr, pc = nc, dd = d; touch(rid + ',' + pr + ',' + pc);
+          for (let s = 0; s < 120; s++) { const t = g[pr][pc]; if (t === 'I') {} else if (QCONV[t]) dd = QCONV[t]; else break;
+            const qr = pr + dd[0], qc = pc + dd[1]; if (qr < 0 || qc < 0 || qr >= rg.h || qc >= rg.w || !passable(rid, qr, qc)) break; pr = qr; pc = qc; touch(rid + ',' + pr + ',' + pc); }
+          let fin = rid + ',' + pr + ',' + pc;
+          if (g[pr][pc] === 'T' || g[pr][pc] === 'U') { const other = g[pr][pc] === 'T' ? 'U' : 'T'; for (let rr = 0; rr < rg.h; rr++) for (let cc = 0; cc < rg.w; cc++) if (g[rr][cc] === other) fin = rid + ',' + rr + ',' + cc; }
+          stop(fin);
+        }
+      }
+      return reach;
+    };
+    const opened = new Set(); let reach = new Set();
+    for (let round = 0; round < 200; round++) {
+      const openCells = new Set(); for (const f of opened) for (const [a, b, c] of locks.get(f)) openCells.add(a + ',' + b + ',' + c);
+      let nCr = 0; for (;;) { reach = explore(openCells, nCr); let c2 = 0; for (const p of reach) { const o = objat.get(p); if (o && o.type === 1) c2++; } if (c2 === nCr) break; nCr = c2; }
+      let keys = 0; for (const p of reach) { const o = objat.get(p); if (o && o.type === 2) keys++; }
+      let progressed = false;
+      for (const [f, cells] of locks) { if (opened.has(f) || keys - opened.size <= 0) continue;
+        for (const [rid, r, c] of cells) if (DV4.some(d => reach.has(rid + ',' + (r + d[0]) + ',' + (c + d[1])))) { opened.add(f); progressed = true; break; }
+        if (progressed) break; }
+      if (!progressed) break;
+    }
+    for (const r of regs) if (![...reach].some(p => p.startsWith(r.id + ','))) Wn.push('Region ' + nm(r) + ' is never reached from the start');
+    for (const r of regs) for (const o of r.objs) if ([1,2,9,5,4,10,6].includes(o.type) && !reach.has(r.id + ',' + o.row + ',' + o.col)) Wn.push('Unreachable ' + QOBJ[o.type] + ' in region ' + nm(r) + ' at ' + o.col + ',' + o.row);
+    const keysTotal = regs.reduce((n, r) => n + r.objs.filter(o => o.type === 2).length, 0);
+    if (opened.size < locks.size) Wn.push('Locks never opened: ' + (locks.size - opened.size) + ' of ' + locks.size + ' (keys in world: ' + keysTotal + ')');
+    if (!regs.some(r => r.objs.some(o => o.type === 9))) Wn.push('No win diamond in the world');
+    I.push(regs.length + ' regions, ' + crystals + ' crystals, ' + keysTotal + ' keys, ' + locks.size + ' lock groups, ' + reach.size + ' reachable stops');
+  }
+  return {E, W:Wn, I};
+}
+
+/* ---------------- zip (store) ---------------- */
+function makeZip(files) {       // files: [{name, data:Uint8Array}]
+  const enc = new TextEncoder(); const parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const nm = enc.encode(f.name), crc = crc32(f.data), n = f.data.length;
+    const h = new Uint8Array(30 + nm.length), dv = new DataView(h.buffer);
+    dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint16(10, 0, true); dv.setUint16(12, 0x21, true);
+    dv.setUint32(14, crc, true); dv.setUint32(18, n, true); dv.setUint32(22, n, true); dv.setUint16(26, nm.length, true); h.set(nm, 30);
+    const c = new Uint8Array(46 + nm.length), cv = new DataView(c.buffer);
+    cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(14, 0x21, true);
+    cv.setUint32(16, crc, true); cv.setUint32(20, n, true); cv.setUint32(24, n, true); cv.setUint16(28, nm.length, true); cv.setUint32(42, off, true); c.set(nm, 46);
+    parts.push(h, f.data); central.push(c); off += h.length + n;
+  }
+  const cdLen = central.reduce((s, c) => s + c.length, 0), end = new Uint8Array(22), ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true); ev.setUint32(12, cdLen, true); ev.setUint32(16, off, true);
+  const all = [...parts, ...central, end]; const out = new Uint8Array(all.reduce((s, a) => s + a.length, 0)); let p = 0; for (const a of all) { out.set(a, p); p += a.length; }
+  return out;
+}
+if (typeof module !== 'undefined') module.exports = {G, validate, deepCheck, slotBuild, slotParse, packBuild, packParse, packSize, portalBuild, portalParse, portalTxtBuild, portalTxtParse, portalValidate, questBuild, questParse, questValidate, makeZip, crc32, nameFix, blank, PORTAL_TILES, QUEST_TILES};
+</script>
+
+<script id="ui">
+if (typeof document !== 'undefined') (function () {
+'use strict';
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const KEY = 'arcadia_levels_v1';
+
+/* ---------------- state ---------------- */
+let S = {games:{}, portal:null, quest:null, mode:'g0', sel:{}, gen:1, letter:'a'};
+function load() { try { const j = localStorage.getItem(KEY); if (j) { const o = JSON.parse(j); if (o && o.games) S = Object.assign(S, o); } } catch (e) {} }
+let saveT = 0;
+function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(S, (k, v) => k[0] === '_' ? undefined : v)); } catch (e) {} }, 300); }
+const status = m => { $('#status').textContent = m; };
+const gdata = id => (S.games[id] = S.games[id] || {title:'', levels:[]});
+const isGame = () => S.mode[0] === 'g';
+const curId = () => +S.mode.slice(1);
+function newLevel(id) { const g = G[id]; return {name:'LEVEL', par:5, w:g.w, h:g.h, cells:blank(g.w, g.h, g.def), verified:false, slot:-1, best:NO_BEST}; }
+function dl(name, data, mime) {
+  const blob = new Blob([data], {type:mime || 'application/octet-stream'}); const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); status('Downloaded ' + name + ' (' + data.length + ' bytes)');
+}
+const selIdx = () => { const n = S.mode === 'portal' ? (S.portal ? S.portal.levels.length : 0) : isGame() ? gdata(curId()).levels.length : 0; let i = S.sel[S.mode] || 0; if (i >= n) i = Math.max(0, n - 1); return i; };
+
+/* ---------------- grid editor ---------------- */
+class GridEd {
+  constructor(cv, cfg) { this.cv = cv; this.cfg = cfg; this.tool = 'paint'; this.stroke = null; this.rect0 = null;
+    cv.addEventListener('pointerdown', e => this.pd(e)); cv.addEventListener('pointermove', e => this.pm(e)); window.addEventListener('pointerup', e => this.pu(e)); cv.addEventListener('contextmenu', e => e.preventDefault()); }
+  m() { return this.cfg.model(); }
+  geo() { const m = this.m(); if (!m) return null; const wrap = $('#cvwrap'), maxW = Math.max(180, wrap.clientWidth - 24);
+    if (this.cfg.bars && this.cfg.bars()) { const cw = Math.max(14, Math.min(44, Math.floor(maxW / m.w))); return {cw, ch:170, W:cw * m.w, H:170, bars:true}; }
+    const cs = Math.max(8, Math.min(48, Math.floor(maxW / m.w), Math.floor(620 / m.h))); return {cw:cs, ch:cs, W:cs * m.w, H:cs * m.h, bars:false}; }
+  draw() {
+    const m = this.m(), cv = this.cv, ctx = cv.getContext('2d'); if (!m) { cv.width = 10; cv.height = 10; return; }
+    const g = this.g = this.geo(); cv.width = g.W; cv.height = g.H; const pal = this.cfg.palette(); const byv = new Map(pal.map(p => [p.v, p]));
+    ctx.fillStyle = '#0d0f13'; ctx.fillRect(0, 0, g.W, g.H);
+    for (let r = 0; r < m.h; r++) for (let c = 0; c < m.w; c++) {
+      const v = m.cells[r][c], p = byv.get(v), col = p ? p.color : '#f0f';
+      if (g.bars) { const max = this.cfg.barMax(); const full = this.cfg.isPad && this.cfg.isPad(v); const bh = full ? g.ch : Math.round((v + 1) / (max + 1) * (g.ch - 14));
+        ctx.fillStyle = '#1b1e26'; ctx.fillRect(c * g.cw, 0, g.cw, g.ch); ctx.fillStyle = full ? col : '#7e8aa3'; ctx.fillRect(c * g.cw + 2, g.ch - bh, g.cw - 4, bh);
+        ctx.fillStyle = '#fff'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(full ? 'P' : String(v), c * g.cw + g.cw / 2, g.ch - bh - 3 < 10 ? 11 : g.ch - bh - 3); }
+      else { ctx.fillStyle = col; ctx.fillRect(c * g.cw, r * g.ch, g.cw, g.ch);
+        if (g.cw >= 14) { ctx.fillStyle = p && p.dark ? '#fff' : '#000a'; ctx.font = Math.max(9, g.cw * .5) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          const lab = p ? (p.label !== undefined ? p.label : '') : '?'; if (lab) ctx.fillText(lab, c * g.cw + g.cw / 2, r * g.ch + g.ch / 2 + 1); } }
+    }
+    ctx.strokeStyle = '#0008'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let c = 0; c <= m.w; c++) { ctx.moveTo(c * g.cw + .5, 0); ctx.lineTo(c * g.cw + .5, g.H); } for (let r = 0; r <= m.h; r++) { ctx.moveTo(0, r * g.ch + .5); ctx.lineTo(g.W, r * g.ch + .5); }
+    ctx.stroke();
+    if (this.cfg.overlay) this.cfg.overlay(ctx, g);
+    if (this.rect0 && this.rectNow) { const a = this.rect0, b = this.rectNow; ctx.strokeStyle = '#fff'; ctx.strokeRect(Math.min(a.c, b.c) * g.cw + 1, Math.min(a.r, b.r) * g.ch + 1, (Math.abs(a.c - b.c) + 1) * g.cw - 2, (Math.abs(a.r - b.r) + 1) * g.ch - 2); }
+  }
+  at(e) { const m = this.m(); if (!m || !this.g) return null; const rc = this.cv.getBoundingClientRect(); const x = (e.clientX - rc.left) * this.cv.width / rc.width, y = (e.clientY - rc.top) * this.cv.height / rc.height;
+    const c = Math.floor(x / this.g.cw), r = this.g.bars ? 0 : Math.floor(y / this.g.ch); if (c < 0 || r < 0 || c >= m.w || r >= m.h) return null; return {c, r, y}; }
+  snap() { const m = this.m(); if (!m) return; const h = m._h = m._h || {u:[], r:[]}; h.u.push(JSON.stringify({w:m.w, h:m.h, cells:m.cells})); if (h.u.length > 60) h.u.shift(); h.r = []; }
+  restore(s) { const m = this.m(), o = JSON.parse(s); m.w = o.w; m.h = o.h; m.cells = o.cells; }
+  undo() { const m = this.m(), h = m && m._h; if (!h || !h.u.length) return; h.r.push(JSON.stringify({w:m.w, h:m.h, cells:m.cells})); this.restore(h.u.pop()); this.changed(); }
+  redo() { const m = this.m(), h = m && m._h; if (!h || !h.r.length) return; h.u.push(JSON.stringify({w:m.w, h:m.h, cells:m.cells})); this.restore(h.r.pop()); this.changed(); }
+  changed() { this.draw(); this.cfg.onEdit(); }
+  put(c, r, v, y) { const m = this.m(); if (this.g.bars && this.cfg.heightFromY && v !== 'erase') { const hv = this.cfg.heightFromY(y, this.g.ch, v); if (hv !== null) v = hv; } if (v === 'erase') v = this.cfg.erase(); if (m.cells[r][c] !== v) { m.cells[r][c] = v; return true; } return false; }
+  pd(e) { const p = this.at(e); if (!p) return; e.preventDefault(); this.cv.setPointerCapture && this.cv.setPointerCapture(e.pointerId);
+    const right = e.button === 2, m = this.m();
+    if (this.cfg.click && this.cfg.click(p, e, right)) { this.draw(); return; }
+    if (e.altKey || this.tool === 'pick') { const v = m.cells[p.r][p.c]; this.cfg.setBrush(v); return; }
+    const val = right ? 'erase' : this.cfg.brush();
+    if (this.tool === 'fill') { this.snap(); this.fill(p.c, p.r, val === 'erase' ? this.cfg.erase() : val); this.changed(); return; }
+    if (this.tool === 'rect') { this.rect0 = p; this.rectNow = p; this.rectVal = val; this.stroke = 'rect'; return; }
+    this.snap(); this.stroke = val; if (this.put(p.c, p.r, val, p.y)) this.changed(); }
+  pm(e) { if (!this.stroke) return; const p = this.at(e); if (!p) return;
+    if (this.stroke === 'rect') { this.rectNow = p; this.draw(); return; }
+    if (this.put(p.c, p.r, this.stroke, p.y)) this.changed(); }
+  pu() { if (this.stroke === 'rect' && this.rect0) { const a = this.rect0, b = this.rectNow; this.snap(); const m = this.m();
+      for (let r = Math.min(a.r, b.r); r <= Math.max(a.r, b.r); r++) for (let c = Math.min(a.c, b.c); c <= Math.max(a.c, b.c); c++) this.put(c, r, this.rectVal, 0);
+      this.rect0 = null; this.changed(); }
+    this.stroke = null; }
+  fill(c, r, v) { const m = this.m(), t = m.cells[r][c]; if (t === v) return; const st = [[c, r]];
+    while (st.length) { const [x, y] = st.pop(); if (x < 0 || y < 0 || x >= m.w || y >= m.h || m.cells[y][x] !== t) continue; m.cells[y][x] = v; st.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]); } }
+  op(fn) { const m = this.m(); if (!m) return; this.snap(); fn(m); this.changed(); }
+}
+
+let ed, curModel = () => null, curPalette = () => [], brush = null;
+const ctxs = {
+  game: {
+    model: () => { if (!isGame()) return null; const L = gdata(curId()).levels; return L[selIdx()] || null; },
+    palette: () => G[curId()].t.map((t, i) => ({v:i, color:t[1], label:String(i), name:t[0], dark:t[1] === '#05060a' || t[1] === '#111418'})),
+    erase: () => G[curId()].def, bars: () => !!G[curId()].bars, barMax: () => (G[curId()].t.length - (curId() === 12 ? 2 : 1)),
+    isPad: v => curId() === 12 && v === 9,
+    heightFromY: (y, ch, v) => { if (curId() === 12 && v === 9) return null; const max = G[curId()].t.length - (curId() === 12 ? 2 : 1); const f = 1 - Math.min(1, Math.max(0, (y - 0) / ch)); return Math.max(0, Math.min(max, Math.round(f * (max + 1) - 0.5))); }
+  },
+  portal: {
+    model: () => S.mode === 'portal' && S.portal ? S.portal.levels[selIdx()] || null : null,
+    palette: () => PORTAL_TILES.map(t => ({v:t[0], color:t[2], label:t[0], name:t[1], dark:true})), erase: () => '.'
+  },
+  quest: {
+    model: () => { if (S.mode !== 'quest' || !S.quest) return null; return S.quest.regions[S.qsel || 0] || null; },
+    palette: () => QUEST_TILES.map(t => ({v:t[0], color:t[2], label:t[0], name:t[1], dark:true})), erase: () => '.'
+  }
+};
+function cfgNow() { return S.mode === 'portal' ? ctxs.portal : S.mode === 'quest' ? ctxs.quest : ctxs.game; }
+function brushNow() { const pal = cfgNow().palette(); if (!pal.length) return null; if (!pal.some(p => p.v === brush)) brush = pal[Math.min(1, pal.length - 1)].v; return brush; }
+ed = new GridEd($('#cv'), {
+  model: () => cfgNow().model(), palette: () => cfgNow().palette(), erase: () => cfgNow().erase(), brush: () => brushNow(), setBrush: v => { brush = v; renderPalette(); },
+  bars: () => cfgNow().bars && cfgNow().bars(), barMax: () => cfgNow().barMax(), isPad: v => cfgNow().isPad && cfgNow().isPad(v), heightFromY: (y, ch, v) => cfgNow().heightFromY ? cfgNow().heightFromY(y, ch, v) : null,
+  overlay: (ctx, g) => { if (S.mode === 'quest') questOverlay(ctx, g); },
+  click: (p, e, right) => S.mode === 'quest' ? questClick(p, e, right) : false,
+  onEdit: () => { save(); renderChecks(); renderLeftBadges(); }
+});
+
+/* ---------------- shell ---------------- */
+function buildModeSelect() {
+  const s = $('#mode'); let h = '<optgroup label="Games with an on-device level creator (25)">';
+  for (const g of G) h += '<option value="g' + g.id + '">' + g.id + ' - ' + esc(g.name) + '</option>';
+  h += '</optgroup><optgroup label="Other content"><option value="portal">Portal hand-made levels (portal.lvl)</option><option value="quest">Portal Quest world (quest.wld)</option></optgroup>';
+  s.innerHTML = h; s.value = S.mode; s.onchange = () => { S.mode = s.value; if (isGame() && !gdata(curId()).levels.length) gdata(curId()).levels.push(newLevel(curId())); save(); renderAll(); };
+}
+function renderAll() { $('#mode').value = S.mode; renderLeft(); renderTools(); renderRight(); renderPalette(); ed.draw(); renderChecks(); renderCenterExtra(); }
+
+/* ---------------- left panel ---------------- */
+function lvlDot(id, lv) { const v = validate(id, lv.w, lv.h, lv.cells); return v.err.length ? 'e' : v.warn.length ? 'w' : ''; }
+function renderLeftBadges() { renderLeft(true); }
+function renderLeft(keep) {
+  const L = $('#left');
+  if (isGame()) {
+    const id = curId(), d = gdata(id), g = G[id], sel = selIdx();
+    let h = '<div class="card"><h3>' + esc(g.name) + ' - levels</h3>';
+    h += d.levels.map((lv, i) => '<div class="lvl' + (i === sel ? ' sel' : '') + '" data-i="' + i + '"><span class="dot ' + lvlDot(id, lv) + '"></span><span class="nm">' + (i + 1) + '. ' + esc(lv.name || '(unnamed)') + '</span>' + (lv.slot >= 0 ? '<span class="tag">slot ' + lv.slot + '</span>' : '') + '</div>').join('') || '<small>No levels yet.</small>';
+    h += '<div class="row"><button id="lNew">New</button><button id="lDup">Duplicate</button><button id="lDel">Delete</button><button id="lUp">Up</button><button id="lDn">Down</button></div>';
+    h += '<div class="hint">Max 60 levels per pack. Slots (0-4) are the on-device custom slots of this game.</div></div>';
+    h += '<div class="card"><h3>Pack info</h3><div class="row">Title <input type="text" id="pkTitle" maxlength="12" value="' + esc(d.title) + '"></div><div id="pkSize" class="hint"></div></div>';
+    L.innerHTML = h; bindGameLeft(); updPkSize();
+  } else if (S.mode === 'portal') {
+    const P = S.portal; let h = '<div class="card"><h3>Portal levels</h3>';
+    if (!P) h += '<small>Nothing loaded. Import portal.lvl or portal_levels.txt, or start empty.</small><div class="row"><button id="pNewPack">Start empty</button></div>';
+    else { const sel = selIdx(); h += '<div style="max-height:420px;overflow:auto">' + P.levels.map((lv, i) => { const v = portalValidate(lv); return '<div class="lvl' + (i === sel ? ' sel' : '') + '" data-i="' + i + '"><span class="dot ' + (v.err.length ? 'e' : v.warn.length ? 'w' : '') + '"></span><span class="nm">L' + String(i + 1).padStart(2, '0') + ' ' + esc(lv.name) + '</span>' + (i < 5 ? '<span class="tag">flash</span>' : '') + '</div>'; }).join('') + '</div>';
+      h += '<div class="row"><button id="pNew">Append level</button><button id="pDup">Duplicate (append)</button><button id="pDel">Delete last</button></div><div class="hint">Level number = position. The device plays records 6..52; 1-5 stay in flash (their data is ignored). Reordering or removing earlier levels renumbers everything, so only append.</div>'; }
+    L.innerHTML = h + '</div>'; bindPortalLeft();
+  } else {
+    L.innerHTML = '<div class="card" id="qLeft"></div>'; renderQuestLeft();
+  }
+}
+function bindGameLeft() {
+  const id = curId(), d = gdata(id);
+  document.querySelectorAll('#left .lvl').forEach(e => e.onclick = () => { S.sel[S.mode] = +e.dataset.i; save(); renderAll(); });
+  $('#lNew').onclick = () => { if (d.levels.length >= 60) return status('A pack holds at most 60 levels'); d.levels.push(newLevel(id)); S.sel[S.mode] = d.levels.length - 1; save(); renderAll(); };
+  $('#lDup').onclick = () => { const lv = d.levels[selIdx()]; if (!lv || d.levels.length >= 60) return; const c = JSON.parse(JSON.stringify(lv, (k, v) => k[0] === '_' ? undefined : v)); c.slot = -1; d.levels.splice(selIdx() + 1, 0, c); S.sel[S.mode] = selIdx() + 1; save(); renderAll(); };
+  $('#lDel').onclick = () => { if (!d.levels.length) return; d.levels.splice(selIdx(), 1); save(); renderAll(); };
+  $('#lUp').onclick = () => { const i = selIdx(); if (i > 0) { [d.levels[i-1], d.levels[i]] = [d.levels[i], d.levels[i-1]]; S.sel[S.mode] = i - 1; save(); renderAll(); } };
+  $('#lDn').onclick = () => { const i = selIdx(); if (i < d.levels.length - 1) { [d.levels[i+1], d.levels[i]] = [d.levels[i], d.levels[i+1]]; S.sel[S.mode] = i + 1; save(); renderAll(); } };
+  $('#pkTitle').oninput = e => { d.title = e.target.value.toUpperCase(); save(); };
+}
+function updPkSize() { const e = $('#pkSize'); if (!e || !isGame()) return; const d = gdata(curId()); const n = packSize(d.levels); e.innerHTML = d.levels.length + ' levels, pack file ' + n + ' / 20480 bytes' + (n >= 20480 ? ' <b style="color:var(--bad)">TOO LARGE</b>' : ''); }
+function bindPortalLeft() {
+  document.querySelectorAll('#left .lvl').forEach(e => e.onclick = () => { S.sel.portal = +e.dataset.i; save(); renderAll(); });
+  const P = S.portal, $b = id => $('#' + id);
+  if ($b('pNewPack')) $b('pNewPack').onclick = () => { S.portal = {levels:[]}; for (let i = 0; i < 52; i++) S.portal.levels.push(portalBlank('L' + String(i + 1).padStart(2, '0'))); save(); renderAll(); };
+  if ($b('pNew')) $b('pNew').onclick = () => { P.levels.push(portalBlank('L' + String(P.levels.length + 1).padStart(2, '0'))); S.sel.portal = P.levels.length - 1; save(); renderAll(); };
+  if ($b('pDup')) $b('pDup').onclick = () => { const l = P.levels[selIdx()]; if (!l) return; const c = JSON.parse(JSON.stringify(l, (k, v) => k[0] === '_' ? undefined : v)); c.name = ('C' + c.name).slice(0, 12); P.levels.push(c); S.sel.portal = P.levels.length - 1; save(); renderAll(); };
+  if ($b('pDel')) $b('pDel').onclick = () => { if (P.levels.length && confirm('Delete the LAST level (only the last one can go without renumbering)?')) { P.levels.pop(); save(); renderAll(); } };
+}
+function portalBlank(name) { const w = 10, h = 7, c = blank(w, h, '.'); for (let x = 0; x < w; x++) { c[0][x] = '#'; c[h-1][x] = '#'; } for (let y = 0; y < h; y++) { c[y][0] = '#'; c[y][w-1] = '#'; } c[1][1] = 'S'; c[h-2][w-2] = 'G'; return {name, w, h, cells:c}; }
+
+/* ---------------- tools row ---------------- */
+function renderTools() {
+  if (ed.tool === 'obj' && S.mode !== 'quest') ed.tool = 'paint';
+  const t = $('#tools'); const tools = [['paint','Paint'],['rect','Rect'],['fill','Fill'],['pick','Pick']];
+  if (S.mode === 'quest') tools.push(['obj','Objects']);
+  t.innerHTML = tools.map(([k, n]) => '<button data-t="' + k + '" class="' + (ed.tool === k ? 'on' : '') + '">' + n + '</button>').join('') +
+    ' <button id="tUndo">Undo</button><button id="tRedo">Redo</button> <button id="tClear">Clear</button><button id="tFill">Fill all</button><button id="tMirH">Mirror H</button><button id="tMirV">Mirror V</button>' +
+    ' <span id="sizeBox"></span>';
+  t.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { ed.tool = b.dataset.t; renderTools(); renderRight(); });
+  $('#tUndo').onclick = () => ed.undo(); $('#tRedo').onclick = () => ed.redo();
+  $('#tClear').onclick = () => ed.op(m => { const v = cfgNow().erase(); m.cells = blank(m.w, m.h, v); });
+  $('#tFill').onclick = () => ed.op(m => { const v = brushNow(); m.cells = blank(m.w, m.h, v); });
+  $('#tMirH').onclick = () => ed.op(m => { m.cells = m.cells.map(r => r.slice().reverse()); });
+  $('#tMirV').onclick = () => ed.op(m => { m.cells = m.cells.slice().reverse(); });
+  const m = ed.m(), sb = $('#sizeBox');
+  if (m) {
+    const g = isGame() ? G[curId()] : null; const maxW = g ? g.w : 40, maxH = g ? g.h : 40, oneD = g && g.oneD;
+    sb.innerHTML = 'Size <input type="number" id="szW" min="1" max="' + maxW + '" value="' + m.w + '"> x <input type="number" id="szH" min="1" max="' + maxH + '" value="' + m.h + '"' + (oneD ? ' disabled' : '') + '> <button id="szGo">Resize</button>';
+    $('#szGo').onclick = () => { const nw = Math.max(1, Math.min(maxW, +$('#szW').value | 0)), nh = oneD ? 1 : Math.max(1, Math.min(maxH, +$('#szH').value | 0)); const def = cfgNow().erase();
+      ed.op(mm => { const nc = blank(nw, nh, def); for (let r = 0; r < Math.min(nh, mm.h); r++) for (let c = 0; c < Math.min(nw, mm.w); c++) nc[r][c] = mm.cells[r][c]; mm.w = nw; mm.h = nh; mm.cells = nc; }); renderTools(); };
+  }
+}
+document.addEventListener('keydown', e => {
+  if (/INPUT|TEXTAREA|SELECT/.test((e.target.tagName || ''))) return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); ed.undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); ed.redo(); return; }
+  if (/^[0-9]$/.test(e.key) && isGame()) { const pal = ctxs.game.palette(); const p = pal[+e.key]; if (p) { brush = p.v; renderPalette(); } }
+});
+
+/* ---------------- right panel ---------------- */
+function renderPalette() {
+  const box = $('#palBox'); if (!box) return; const pal = cfgNow().palette(), b = brushNow();
+  box.innerHTML = pal.map(p => '<span class="chip' + (p.v === b ? ' sel' : '') + '" data-v="' + esc(p.v) + '"><i style="background:' + p.color + '"></i>' + (isGame() ? p.v + ' ' : esc(p.label) + ' ') + esc(p.name) + '</span>').join('');
+  box.querySelectorAll('.chip').forEach((c, i) => c.onclick = () => { brush = pal[i].v; renderPalette(); });
+}
+function renderRight() {
+  const R_ = $('#right');
+  if (isGame()) {
+    const id = curId(), g = G[id], d = gdata(id), lv = d.levels[selIdx()];
+    let h = '<div class="card"><h3>Palette</h3><div id="palBox"></div><div class="hint">Left drag paints, right drag erases (' + esc(g.t[g.def][0]) + '), keys 0-9 pick a tile, Alt+click = pick. ' + (g.bars ? 'Bar view: click at a height to set it (pick PAD to place the pad).' : '') + '</div></div>';
+    h += '<div class="card"><h3>Rules (' + esc(g.name) + ')</h3><div class="hint" style="margin:0">Grid up to ' + g.w + 'x' + g.h + '. ' + esc(g.rules) + '</div></div>';
+    if (lv) {
+      h += '<div class="card"><h3>This level</h3><div class="row">Name <input type="text" id="lvName" maxlength="8" value="' + esc(lv.name) + '"> <small>A-Z 0-9 -</small></div>' +
+        '<div class="row">Pack difficulty (1-9) <input type="number" id="lvPar" min="1" max="9" value="' + (lv.par || 5) + '"></div>' +
+        '<div class="row">Custom slot <select id="lvSlot"><option value="-1">none</option>' + [0,1,2,3,4].map(s => '<option value="' + s + '"' + (lv.slot === s ? ' selected' : '') + '>slot ' + s + '</option>').join('') + '</select></div>' +
+        '<div class="row"><label><input type="checkbox" id="lvVer"' + (lv.verified ? ' checked' : '') + '> mark "verified" (cleared in Test Play)</label></div>' +
+        '<div class="hint">Verified normally means you cleared it on the device; leave it off unless you really played it. Editing on the device clears it anyway.</div></div>';
+    }
+    h += '<div class="card"><h3>Export</h3>' +
+      '<div class="row">Generation <input type="number" id="xGen" min="1" max="255" value="' + S.gen + '"> File <select id="xLet"><option value="a"' + (S.letter === 'a' ? ' selected' : '') + '>a</option><option value="b"' + (S.letter === 'b' ? ' selected' : '') + '>b</option></select></div>' +
+      '<div class="row"><button class="pri" id="xSlot">Slot file (this level)</button></div>' +
+      '<div class="row"><button id="xSlots">All slot files (zip)</button><button class="pri" id="xPak">Pack g' + id + '.pak</button></div>' +
+      '<div class="row"><button id="xDeep">Deep check' + (id === 10 ? ' (Cube bot)' : '') + '</button></div>' +
+      '<div class="hint">Slot file: <b>levels/g' + id + 's&lt;slot&gt;' + S.letter + '.lvl</b> (device format v4). If the drive already holds a g' + id + 's&lt;slot&gt;*.lvl, delete it first - the newer generation wins. Pack: <b>packs/g' + id + '.pak</b>.</div></div>';
+    R_.innerHTML = h; bindGameRight(lv, id);
+  } else if (S.mode === 'portal') {
+    const lv = S.portal && S.portal.levels[selIdx()];
+    let h = '<div class="card"><h3>Palette</h3><div id="palBox"></div><div class="hint">Exactly one S per level, at most one G. Left drag paints, right drag erases to floor.</div></div>';
+    if (lv) h += '<div class="card"><h3>This level</h3><div class="row">Name <input type="text" id="pName" maxlength="12" value="' + esc(lv.name) + '"> <small>A-Z 0-9 space -</small></div></div>';
+    h += '<div class="card"><h3>Export</h3><div class="row"><button class="pri" id="xPortal">portal.lvl</button><button id="xPortalTxt">portal_levels.txt</button></div><div class="hint">portal.lvl -> <b>packs/portal.lvl</b> (or tools\\out\\portal.lvl + install_assets.ps1 -Portal). portal_levels.txt is the source file for make_portal_pack.py.</div></div>';
+    R_.innerHTML = h;
+    if ($('#pName')) $('#pName').oninput = e => { lv.name = e.target.value.toUpperCase().replace(/[^A-Z0-9 -]/g, ''); save(); renderChecks(); };
+    $('#xPortal').onclick = () => exportPortal(); $('#xPortalTxt').onclick = () => { if (S.portal) dl('portal_levels.txt', portalTxtBuild(S.portal.levels), 'text/plain'); };
+  } else renderQuestRight();
+}
+function bindGameRight(lv, id) {
+  if (lv) {
+    $('#lvName').oninput = e => { lv.name = nameClean(e.target.value, 8); save(); renderLeft(true); };
+    $('#lvPar').oninput = e => { lv.par = Math.max(1, Math.min(9, +e.target.value | 0)); save(); };
+    $('#lvSlot').onchange = e => { const s = +e.target.value; if (s >= 0) gdata(id).levels.forEach(o => { if (o !== lv && o.slot === s) o.slot = -1; }); lv.slot = s; save(); renderLeft(); };
+    $('#lvVer').onchange = e => { lv.verified = e.target.checked; save(); };
+  }
+  $('#xGen').oninput = e => { S.gen = Math.max(1, Math.min(255, +e.target.value | 0)); save(); };
+  $('#xLet').onchange = e => { S.letter = e.target.value; save(); renderRight(); renderPalette(); };
+  $('#xSlot').onclick = () => { if (!lv) return status('No level selected'); if (!okToExport(id, lv)) return; const slot = lv.slot >= 0 ? lv.slot : 0; dl('g' + id + 's' + slot + S.letter + '.lvl', slotBuild(id, lv, S.gen)); };
+  $('#xSlots').onclick = () => { const fs = slotFiles(id); if (!fs.length) return status('Assign slots (0-4) to levels first'); dl('arcadia_g' + id + '_slots.zip', makeZip(fs), 'application/zip'); };
+  $('#xPak').onclick = () => { const d = gdata(id); const err = packProblems(id); if (err) return alert(err); dl('g' + id + '.pak', packBuild(id, d.title || G[id].name, d.levels)); };
+  $('#xDeep').onclick = () => { if (!lv) return; status('Checking...'); setTimeout(() => { const e = deepCheck(id, lv.w, lv.h, lv.cells); const s = validate(id, lv.w, lv.h, lv.cells); renderChecks(e.length ? e : (id === 10 ? ['OK: Cube bot clears all four speed tiers.'] : ['(no extra deep checks for this game)'])); status(''); }, 20); };
+  renderPalette();
+}
+function okToExport(id, lv) { const v = validate(id, lv.w, lv.h, lv.cells); if (v.err.length) return confirm('This level fails the device rules:\n- ' + v.err.join('\n- ') + '\n\nThe device will load it but refuse to play it. Export anyway?'); return true; }
+function packProblems(id) {
+  const d = gdata(id); if (!d.levels.length) return 'No levels in this pack.'; if (d.levels.length > 60) return 'More than 60 levels.'; if (packSize(d.levels) >= 20480) return 'Pack would be ' + packSize(d.levels) + ' bytes (limit 20479). Remove levels.';
+  const bad = d.levels.map((l, i) => [i, validate(id, l.w, l.h, l.cells)]).filter(x => x[1].err.length);
+  if (bad.length && !confirm(bad.length + ' level(s) fail the device rules (they show as "bad" and cannot be played):\n' + bad.slice(0, 6).map(([i, v]) => (i + 1) + '. ' + d.levels[i].name + ': ' + v.err[0]).join('\n') + '\n\nExport anyway?')) return 'Cancelled.';
+  return null;
+}
+function slotFiles(id) { const out = []; for (const lv of gdata(id).levels) if (lv.slot >= 0) out.push({name:'levels/g' + id + 's' + lv.slot + S.letter + '.lvl', data:slotBuild(id, lv, S.gen)}); return out; }
+function exportPortal() { if (!S.portal) return; const bad = S.portal.levels.map((l, i) => [i, portalValidate(l)]).filter(x => x[1].err.length); if (bad.length) return alert('Fix these first:\n' + bad.slice(0, 8).map(([i, v]) => 'L' + (i + 1) + ': ' + v.err[0]).join('\n')); dl('portal.lvl', portalBuild(S.portal.levels)); }
+
+/* ---------------- checks ---------------- */
+function renderChecks(extra) {
+  const c = $('#checks'); let h = '';
+  if (Array.isArray(extra)) { h = extra.map(m => '<div class="msg ' + (m.startsWith('OK') || m.startsWith('(') ? 'o' : 'w') + '">' + esc(m) + '</div>').join(''); c.innerHTML = h; return; }
+  if (isGame()) {
+    const lv = ed.m(); if (!lv) { c.innerHTML = '<div class="msg i">Create or import a level.</div>'; return; }
+    const v = validate(curId(), lv.w, lv.h, lv.cells);
+    h += v.err.map(m => '<div class="msg e">Device rejects: ' + esc(m) + '</div>').join('') + v.warn.map(m => '<div class="msg w">' + esc(m) + '</div>').join('');
+    if (!v.err.length) h += '<div class="msg o">Passes the device validator' + (v.warn.length ? ' (with pack-quality warnings)' : '') + '.' + (v.info ? ' ' + esc(v.info) : '') + '</div>';
+    const d = gdata(curId()); if (d.levels.filter(l => l.slot === lv.slot && lv.slot >= 0).length > 1) h += '<div class="msg w">Two levels share slot ' + lv.slot + '</div>';
+    updPkSize();
+  } else if (S.mode === 'portal') {
+    const lv = ed.m(); if (!lv) { c.innerHTML = '<div class="msg i">Import portal.lvl / portal_levels.txt or start empty.</div>'; return; }
+    const v = portalValidate(lv); h += v.err.map(m => '<div class="msg e">' + esc(m) + '</div>').join('') + v.warn.map(m => '<div class="msg w">' + esc(m) + '</div>').join('') + (v.err.length ? '' : '<div class="msg o">Valid for make_portal_pack / the device.</div>');
+    if (S.portal.levels.length < 52) h += '<div class="msg w">Only ' + S.portal.levels.length + ' levels: the device generates mazes for missing numbers up to 52.</div>';
+  } else h = questChecksHtml();
+  c.innerHTML = h;
+}
+
+/* ---------------- Portal Quest ---------------- */
+const qcol = {1:'#35e0f0',2:'#e8d13a',3:'#a07a1c',4:'#fff',5:'#3fbf6a',6:'#d835c8',7:'#c9a47a',8:'#7be',9:'#6f6',10:'#f9a'};
+let qType = 1, qObjSel = -1;
+function questOverlay(ctx, g) {
+  const rg = ed.m(); if (!rg) return;
+  rg.objs.forEach((o, i) => { const x = o.col * g.cw + g.cw / 2, y = o.row * g.ch + g.ch / 2, r = g.cw * .36;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = qcol[o.type] || '#fff'; ctx.fill(); ctx.lineWidth = i === qObjSel ? 3 : 1; ctx.strokeStyle = i === qObjSel ? '#fff' : '#000'; ctx.stroke();
+    ctx.fillStyle = '#000'; ctx.font = Math.max(9, g.cw * .42) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(o.type), x, y + 1); });
+  const q = S.quest; if (q && q.startRegion === (S.qsel || 0)) { ctx.strokeStyle = '#4da3ff'; ctx.lineWidth = 3; ctx.strokeRect(q.startCol * g.cw + 2, q.startRow * g.ch + 2, g.cw - 4, g.ch - 4); }
+}
+function questClick(p, e, right) {
+  if (ed.tool !== 'obj') return false; const rg = ed.m(); if (!rg) return true;
+  const idx = rg.objs.findIndex(o => o.col === p.c && o.row === p.r);
+  if (right) { if (idx >= 0) { rg.objs.splice(idx, 1); qObjSel = -1; save(); renderRight(); renderChecks(); } return true; }
+  if (idx >= 0) { qObjSel = idx; renderRight(); return true; }
+  if (rg.objs.length >= 28) { status('Max 28 objects per region'); return true; }
+  ed.snap(); const o = {type:qType, col:p.c, row:p.r, flag:255, a:0, b:0, c:0, d:0};
+  if (qType === 1) { const used = new Set(); S.quest.regions.forEach(r => r && r.objs.forEach(x => { if (x.type === 1) used.add(x.flag); })); let f = 0; while (used.has(f)) f++; o.flag = f; }
+  if (qType === 3) rg.cells[p.r][p.c] = 'K'; if (qType === 7) rg.cells[p.r][p.c] = '#'; if (qType === 8) { rg.cells[p.r][p.c] = 'N'; o.a = 90; }
+  if (qType === 4 || qType === 10) { rg.strs.push('Hello!'); o.a = rg.strs.length - 1; }
+  rg.objs.push(o); qObjSel = rg.objs.length - 1; save(); renderRight(); renderChecks(); return true;
+}
+function newRegion(w, h) { const c = blank(w, h, '.'); for (let x = 0; x < w; x++) { c[0][x] = '#'; c[h-1][x] = '#'; } for (let y = 0; y < h; y++) { c[y][0] = '#'; c[y][w-1] = '#'; } return {theme:0, w, h, objs:[], strs:[], cells:c}; }
+function renderQuestLeft() {
+  const q = S.quest, L = $('#qLeft'); if (!L) return;
+  if (!q) { L.innerHTML = '<h3>Portal Quest world</h3><small>Import quest.wld (tools\\out\\quest.wld) or start an empty world.</small><div class="row"><button id="qNew">New 4x3 world</button></div>'; $('#qNew').onclick = () => { S.quest = {W:4, H:3, name:'Portal Quest', crystalTotal:0, crystalNeed:0, startRegion:0, startCol:2, startRow:2, regions:Array(12).fill(null)}; S.quest.regions[0] = newRegion(24, 18); S.qsel = 0; save(); renderAll(); }; return; }
+  let h = '<h3>World map</h3><div id="map" style="grid-template-columns:repeat(' + q.W + ',1fr)"></div><div class="hint">Click a cell to edit that region. Dark = no region.</div>';
+  h += '<div class="row">World <input type="number" id="qW" min="1" max="8" value="' + q.W + '"> x <input type="number" id="qH" min="1" max="8" value="' + q.H + '"> <button id="qRs">Resize</button></div>';
+  h += '<div class="row"><button id="qAdd">Add region</button><button id="qRm">Delete region</button></div><div class="row"><button id="qLink">Open doorways to neighbours</button></div>';
+  L.innerHTML = h; const map = $('#map'); const sel = S.qsel || 0;
+  q.regions.forEach((r, i) => { const b = document.createElement('button'); b.textContent = r ? (i + ' ' + QUEST_THEMES[r.theme % 8].slice(0, 4)) : (i + ''); b.className = i === sel ? 'on' : ''; b.style.opacity = r ? 1 : .4; if (q.startRegion === i) b.style.outline = '2px solid var(--acc)'; b.onclick = () => { S.qsel = i; qObjSel = -1; save(); renderAll(); }; map.appendChild(b); });
+  $('#qRs').onclick = () => { const nw = Math.max(1, Math.min(8, +$('#qW').value | 0)), nh = Math.max(1, Math.min(8, +$('#qH').value | 0)); const nr = Array(nw * nh).fill(null); q.regions.forEach((r, i) => { const x = i % q.W, y = (i / q.W) | 0; if (r && x < nw && y < nh) nr[y * nw + x] = r; });
+    const sx = q.startRegion % q.W, sy = (q.startRegion / q.W) | 0; q.startRegion = sx < nw && sy < nh ? sy * nw + sx : 0; const remap = i => { const x = i % q.W, y = (i / q.W) | 0; return x < nw && y < nh ? y * nw + x : 0; };
+    nr.forEach(r => r && r.objs.forEach(o => { if (o.type === 6) o.a = remap(o.a); })); q.W = nw; q.H = nh; q.regions = nr; S.qsel = 0; save(); renderAll(); };
+  $('#qAdd').onclick = () => { if (!q.regions[sel]) { if (q.regions.filter(Boolean).length >= 64) return; q.regions[sel] = newRegion(24, 18); save(); renderAll(); } };
+  $('#qRm').onclick = () => { if (q.regions[sel] && confirm('Delete region ' + sel + '?')) { q.regions[sel] = null; save(); renderAll(); } };
+  $('#qLink').onclick = () => { questLink(q, sel); save(); renderAll(); };
+}
+function questLink(q, i) {   // carve 2-wide doorways (rows 8-9 / cols 11-12) toward every existing neighbour, on both sides
+  const rg = q.regions[i]; if (!rg) return; const x = i % q.W, y = (i / q.W) | 0; const open = (r, cx, cy) => { if (r.cells[cy] && r.cells[cy][cx] !== undefined && r.cells[cy][cx] !== 'K') r.cells[cy][cx] = '.'; };
+  const nb = (dx, dy) => (x + dx >= 0 && x + dx < q.W && y + dy >= 0 && y + dy < q.H) ? q.regions[(y + dy) * q.W + x + dx] : null;
+  const carve = (r, side) => { const my = Math.floor(r.h / 2), mx = Math.floor(r.w / 2);
+    for (let k = 0; k < 2; k++) for (let d = 0; d < 3; d++) { if (side === 'E') open(r, r.w - 1 - d, my - 1 + k); if (side === 'W') open(r, d, my - 1 + k); if (side === 'S') open(r, mx - 1 + k, r.h - 1 - d); if (side === 'N') open(r, mx - 1 + k, d); } };
+  [['E', 1, 0, 'W'], ['W', -1, 0, 'E'], ['S', 0, 1, 'N'], ['N', 0, -1, 'S']].forEach(([s, dx, dy, o]) => { const n = nb(dx, dy); if (n) { carve(rg, s); carve(n, o); } });
+  status('Doorways opened (2 wide, centred). Both sides use the same row/column.');
+}
+let qLast = null;
+function renderQuestRight() {
+  const q = S.quest, R_ = $('#right'); if (!q) { R_.innerHTML = ''; return; }
+  const sel = S.qsel || 0, rg = q.regions[sel];
+  let h = '<div class="card"><h3>World header</h3><div class="row">Name <input type="text" id="qName" maxlength="12" value="' + esc(q.name) + '"></div>' +
+    '<div class="row">Crystals total <input type="number" id="qCT" min="0" max="250" value="' + q.crystalTotal + '"> need <input type="number" id="qCN" min="0" max="250" value="' + q.crystalNeed + '"></div>' +
+    '<div class="row">Start region <input type="number" id="qSR" min="0" max="63" value="' + q.startRegion + '"> col <input type="number" id="qSC" min="0" max="39" value="' + q.startCol + '"> row <input type="number" id="qSRw" min="0" max="39" value="' + q.startRow + '"></div>' +
+    '<div class="row"><button id="qCount">Set crystal total from objects</button><button id="qSetStart">Start = selected region</button></div></div>';
+  h += '<div class="card"><h3>Palette</h3><div id="palBox"></div></div>';
+  if (rg) {
+    h += '<div class="card"><h3>Region ' + sel + ' (' + (sel % q.W) + ',' + ((sel / q.W) | 0) + ')</h3><div class="row">Theme <select id="qTh">' + QUEST_THEMES.map((t, i) => '<option value="' + i + '"' + (rg.theme === i ? ' selected' : '') + '>' + i + ' ' + t + '</option>').join('') + '</select></div>';
+    h += '<div class="hint">Objects tool: click a tile to add (type below) or select; right-click removes. Types: ' + QOBJ.slice(1).map((n, i) => (i + 1) + '=' + n).join(', ') + '.</div>';
+    h += '<div class="row">New object type <select id="qType">' + QOBJ.slice(1).map((n, i) => '<option value="' + (i + 1) + '"' + (qType === i + 1 ? ' selected' : '') + '>' + (i + 1) + ' ' + n + '</option>').join('') + '</select></div>';
+    h += '<table><tr><th>#</th><th>type</th><th>col</th><th>row</th><th>flag</th><th>a</th><th>b</th><th>c</th><th>d</th><th></th></tr>' + rg.objs.map((o, i) => '<tr data-i="' + i + '" style="' + (i === qObjSel ? 'background:#1f3556' : '') + '"><td title="' + esc(QOBJ[o.type] || '?') + '">' + i + '</td>' + ['type','col','row','flag','a','b','c','d'].map(k => '<td><input type="number" data-k="' + k + '" min="' + (k === 'type' ? 1 : 0) + '" max="' + (k === 'type' ? 10 : 255) + '" value="' + o[k] + '"></td>').join('') + '<td><button data-del="' + i + '">x</button></td></tr>').join('') + '</table>';
+    h += '<div class="hint">flag 255 = none. Crystals use flags 0..total-1. Teleport: a=dest region, b=dest col, c=dest row. Gate: a=crystals needed. Sign/NPC: a=string index.</div>';
+    h += '<h3 style="margin-top:10px">Strings (' + rg.strs.length + '/12)</h3>' + rg.strs.map((s, i) => '<div class="row">' + i + ' <input class="str" data-s="' + i + '" maxlength="120" value="' + esc(s) + '"><button data-sdel="' + i + '">x</button></div>').join('') + '<div class="row"><button id="qSAdd">Add string</button></div></div>';
+  }
+  h += '<div class="card"><h3>Export</h3><div class="row"><button class="pri" id="xQuest">quest.wld</button></div><div class="hint">-> <b>worlds/quest.wld</b> (or tools\\out\\quest.wld + install_assets.ps1 -Quest). World id is recomputed (CRC32 of the region data) so old progress resets when the world changes.</div></div>';
+  R_.innerHTML = h; renderPalette();
+  const set = (k, v) => { q[k] = v; save(); renderChecks(); };
+  $('#qName').oninput = e => set('name', e.target.value.replace(/[^\x20-\x7e]/g, '')); $('#qCT').oninput = e => set('crystalTotal', +e.target.value | 0); $('#qCN').oninput = e => set('crystalNeed', +e.target.value | 0);
+  $('#qSR').oninput = e => set('startRegion', +e.target.value | 0); $('#qSC').oninput = e => set('startCol', +e.target.value | 0); $('#qSRw').oninput = e => set('startRow', +e.target.value | 0);
+  $('#qCount').onclick = () => { let n = 0; q.regions.forEach(r => r && r.objs.forEach(o => { if (o.type === 1) n++; })); q.crystalTotal = n; save(); renderAll(); };
+  $('#qSetStart').onclick = () => { q.startRegion = sel; save(); renderAll(); };
+  $('#xQuest').onclick = () => { const v = questValidate(q); if (v.E.length) return alert('Fix these first:\n- ' + v.E.slice(0, 10).join('\n- ')); if (v.W.length && !confirm(v.W.length + ' warnings (first: ' + v.W[0] + '). Export anyway?')) return; dl('quest.wld', questBuild(q)); };
+  if (rg) {
+    $('#qTh').onchange = e => { rg.theme = +e.target.value; save(); renderLeft(); };
+    $('#qType').onchange = e => { qType = +e.target.value; };
+    R_.querySelectorAll('tr[data-i] input').forEach(inp => inp.oninput = () => { const o = rg.objs[+inp.closest('tr').dataset.i]; o[inp.dataset.k] = Math.max(0, Math.min(255, +inp.value | 0)); save(); ed.draw(); renderChecks(); });
+    R_.querySelectorAll('tr[data-i]').forEach(tr => tr.onclick = e => { if (e.target.tagName !== 'INPUT') { qObjSel = +tr.dataset.i; renderRight(); ed.draw(); } });
+    R_.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { rg.objs.splice(+b.dataset.del, 1); qObjSel = -1; save(); renderRight(); ed.draw(); renderChecks(); });
+    R_.querySelectorAll('input[data-s]').forEach(inp => inp.oninput = () => { rg.strs[+inp.dataset.s] = inp.value.replace(/[^\x20-\x7e]/g, ''); save(); renderChecks(); });
+    R_.querySelectorAll('[data-sdel]').forEach(b => b.onclick = () => { const i = +b.dataset.sdel; rg.strs.splice(i, 1); rg.objs.forEach(o => { if ((o.type === 4 || o.type === 10) && o.a > i) o.a--; }); save(); renderRight(); renderChecks(); });
+    $('#qSAdd').onclick = () => { if (rg.strs.length < 12) { rg.strs.push('New text'); save(); renderRight(); } };
+  }
+}
+function questChecksHtml() {
+  const q = S.quest; if (!q) return '<div class="msg i">Import quest.wld or start a new world.</div>'; const v = questValidate(q);
+  return v.E.map(m => '<div class="msg e">' + esc(m) + '</div>').join('') + v.W.slice(0, 40).map(m => '<div class="msg w">' + esc(m) + '</div>').join('') + (v.W.length > 40 ? '<div class="msg w">... ' + (v.W.length - 40) + ' more</div>' : '') + v.I.map(m => '<div class="msg i">' + esc(m) + '</div>').join('') + (v.E.length ? '' : '<div class="msg o">World is structurally valid (reachability checks assume plate/laser puzzles are solved).</div>');
+}
+function renderCenterExtra() { $('#centerExtra').innerHTML = ''; }
+
+/* ---------------- import / export all ---------------- */
+async function importFiles(files) {
+  let n = 0; const msgs = [];
+  for (const f of files) {
+    const b = new Uint8Array(await f.arrayBuffer()); const nm = f.name.toLowerCase();
+    try {
+      if (b.length >= 4 && String.fromCharCode(b[0], b[1], b[2], b[3]) === 'ARPK') { const r = packParse(b); if (r.error) throw new Error(r.error); const d = gdata(r.game); d.title = r.title; d.levels = r.levels.map(l => Object.assign({verified:false, slot:-1, best:NO_BEST}, l)); S.mode = 'g' + r.game; S.sel[S.mode] = 0; msgs.push(f.name + ': pack, ' + r.levels.length + ' levels' + (r.warn ? ' (' + r.warn + ')' : '')); n++; }
+      else if (b.length >= 4 && String.fromCharCode(b[0], b[1], b[2], b[3]) === 'ARPL') { const r = portalParse(b); if (r.error) throw new Error(r.error); S.portal = {levels:r.levels}; S.mode = 'portal'; S.sel.portal = 5; msgs.push(f.name + ': ' + r.levels.length + ' portal levels'); n++; }
+      else if (b.length >= 4 && String.fromCharCode(b[0], b[1], b[2], b[3]) === 'ARQW') { const r = questParse(b); if (r.error) throw new Error(r.error); S.quest = r.q; S.qsel = Math.min(r.q.startRegion, r.q.regions.length - 1); S.mode = 'quest'; msgs.push(f.name + ': quest world, ' + r.q.regions.filter(Boolean).length + ' regions'); n++; }
+      else if (b.length && b[0] >= 0xA5 && b[0] <= 0xA8) { const r = slotParse(b); if (r.error) throw new Error(r.error); const m = /g(\d+)s(\d)([ab])?\.lvl$/.exec(nm); const lv = Object.assign({par:5, slot:-1}, r.lv);
+          if (m) { const slot = +m[2]; if (+m[1] === r.game && slot < 5) lv.slot = slot; else msgs.push(f.name + ': file name does not match the content (game ' + r.game + ')'); }
+          const d = gdata(r.game); const dup = lv.slot >= 0 ? d.levels.findIndex(o => o.slot === lv.slot) : -1; if (dup >= 0) { if ((r.gen || 0) >= (d.levels[dup]._gen || 0)) { lv._gen = r.gen; d.levels[dup] = lv; } } else { lv._gen = r.gen; d.levels.push(lv); }
+          S.mode = 'g' + r.game; S.sel[S.mode] = d.levels.indexOf(lv) >= 0 ? d.levels.indexOf(lv) : 0; if (r.gen) S.gen = r.gen; msgs.push(f.name + ': slot file v' + r.ver + ', ' + G[r.game].name + (r.lv.verified ? ', verified' : '')); n++; }
+      else if (nm.endsWith('.txt') || nm.endsWith('.lvltxt')) { const t = new TextDecoder().decode(b); const lv = portalTxtParse(t); if (!lv.length) throw new Error('no levels found'); S.portal = {levels:lv}; S.mode = 'portal'; S.sel.portal = 5; msgs.push(f.name + ': ' + lv.length + ' levels from text'); n++; }
+      else throw new Error('unrecognised file');
+    } catch (e) { msgs.push(f.name + ': ' + e.message); }
+  }
+  save(); renderAll(); status(n + ' imported. ' + msgs.join(' | '));
+}
+function exportEverything() {
+  const files = []; const rep = [];
+  for (const g of G) { const d = S.games[g.id]; if (!d || !d.levels.length) continue; files.push(...slotFiles(g.id)); if (!packProblems_quiet(g.id)) { files.push({name:'packs/g' + g.id + '.pak', data:packBuild(g.id, d.title || g.name, d.levels)}); rep.push(g.name); } }
+  if (S.portal) { const bad = S.portal.levels.some(l => portalValidate(l).err.length); if (!bad) files.push({name:'packs/portal.lvl', data:portalBuild(S.portal.levels)}); else rep.push('(portal skipped: errors)'); }
+  if (S.quest) { const v = questValidate(S.quest); if (!v.E.length) files.push({name:'worlds/quest.wld', data:questBuild(S.quest)}); else rep.push('(quest skipped: errors)'); }
+  if (!files.length) return status('Nothing to export yet');
+  files.push({name:'READ_ME.txt', data:new TextEncoder().encode('Copy the folders levels/ packs/ worlds/ onto the PyGamer drive (Settings > USB drive), EJECT the drive, then press B on the PyGamer.\r\nDelete any older levels/g<id>s<slot>*.lvl you are replacing first (the newer generation wins).\r\n')});
+  dl('arcadia_drive_files.zip', makeZip(files), 'application/zip'); status(files.length - 1 + ' files in the zip. ' + rep.join(', '));
+}
+function packProblems_quiet(id) { const d = gdata(id); return !d.levels.length || d.levels.length > 60 || packSize(d.levels) >= 20480; }
+
+/* ---------------- wiring ---------------- */
+$('#btnImport').onclick = () => $('#fileIn').click();
+$('#fileIn').onchange = e => { importFiles([...e.target.files]); e.target.value = ''; };
+$('#btnAll').onclick = exportEverything;
+$('#btnReset').onclick = () => { if (confirm('Delete all levels stored in this browser?')) { S = {games:{}, portal:null, quest:null, mode:'g0', sel:{}, gen:1, letter:'a'}; try { localStorage.removeItem(KEY); } catch (e) {} renderAll(); } };
+let dragN = 0;
+window.addEventListener('dragenter', e => { dragN++; $('#drop').style.display = 'flex'; e.preventDefault(); });
+window.addEventListener('dragleave', () => { if (--dragN <= 0) { dragN = 0; $('#drop').style.display = 'none'; } });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('#drop').style.display = 'none'; if (e.dataTransfer.files.length) importFiles([...e.dataTransfer.files]); });
+window.addEventListener('resize', () => ed.draw());
+load();
+if (!/^(g\d+|portal|quest)$/.test(S.mode)) S.mode = 'g0';
+buildModeSelect();
+if (isGame() && !gdata(curId()).levels.length) gdata(curId()).levels.push(newLevel(curId()));
+renderAll();
+window.__arcadia = {S: () => S, importFiles, renderAll, ed};
+})();
+</script>
+</body>
+</html>

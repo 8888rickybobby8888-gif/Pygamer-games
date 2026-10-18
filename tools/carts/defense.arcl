@@ -1,0 +1,213 @@
+// BASE DEFENSE : build cannons and frost towers beside the road. Stop the waves reaching your base.
+@name "BASE DEFENSE"
+@blurb "Strategy: hold the line"
+@author "Arcadia"
+@version 1
+@color green
+@twoplayer
+@tiers "NORMAL" "EASY" "HARD" "EXTREME"
+@help "D-pad: move cursor" "A: build / upgrade" "B: cannon or frost"
+@icon "........"
+      "#######."
+      "......#."
+      ".####.#."
+      ".#..#.#."
+      ".#.##.#."
+      ".#....#."
+      ".######."
+@sprite road   "########"
+               "#######."
+               "########"
+               "##.#####"
+               "########"
+               "#####.##"
+               "########"
+               ".#######"
+@sprite cannon "..####.."
+               ".######."
+               "########"
+               "###..###"
+               "###..###"
+               "########"
+               ".######."
+               "..####.."
+@sprite frost  "...##..."
+               "#..##..#"
+               ".#.##.#."
+               "..####.."
+               "########"
+               "..####.."
+               ".#.##.#."
+               "#..##..#"
+@sprite base   "#.#..#.#"
+               "########"
+               "#.####.#"
+               "#.####.#"
+               "########"
+               "##.##.##"
+               "########"
+               "########"
+
+array wx[6] = {0, 17, 17, 2, 2, 19};
+array wy[6] = {2, 2, 6, 6, 10, 10};
+array hpT[4] = {10, 7, 13, 16};
+array goldT[4] = {70, 100, 60, 50};
+array lifeT[4] = {10, 14, 8, 6};
+array m[280];
+array ex[10];
+array ey[10];
+array ehp[10];
+array emax[10];
+array es[10];
+array esl[10];
+array tx[12];
+array ty[12];
+array tlv[12];
+array tty[12];
+array tcd[12];
+array tsx[12];
+array tsy[12];
+array tsh[12];
+var cx = 9, cy = 4, mt, gold, lives, wave, spawnLeft, spawnT, nt, kills, sel, msg, msgT, pause, waveHp, flash;
+
+func place(x, y) { mset(m, 20, 14, x, y, 65); }
+
+func init() {
+  setpal(1, BROWN); setpal(2, ORANGE); setpal(3, CYAN); setpal(4, YELLOW);
+  for (var s = 0; s < 5; s++) {
+    var x = wx[s]; var y = wy[s];
+    while (x != wx[s + 1] || y != wy[s + 1]) {
+      place(x, y);
+      if (x < wx[s + 1]) x++; else if (x > wx[s + 1]) x--;
+      else if (y < wy[s + 1]) y++; else y--;
+    }
+  }
+  place(19, 10);
+  gold = goldT[tier()]; lives = lifeT[tier()]; wave = 0; pause = 60;
+  for (var i = 0; i < 10; i++) ehp[i] = 0;
+}
+
+func startWave() {
+  wave++;
+  spawnLeft = 5 + wave * 2; spawnT = 0;
+  waveHp = hpT[tier()] + wave * 3 + (wave / 3) * 3;
+  msg = 1; msgT = 60; sfx(1);
+}
+
+func spawn() {
+  for (var i = 0; i < 10; i++) {
+    if (ehp[i] <= 0) {
+      ex[i] = -4 * 16; ey[i] = (wy[0] * 8 + 4) * 16; es[i] = 0; esl[i] = 0;
+      var boss = (wave % 5 == 0 && spawnLeft == 1);
+      ehp[i] = boss ? waveHp * 4 : waveHp; emax[i] = ehp[i];
+      return 0;
+    }
+  }
+}
+
+func frame() {
+  flash++;
+  mt++;
+  if (mt >= 3) {
+    if (btn(LEFT)) { cx--; mt = 0; } else if (btn(RIGHT)) { cx++; mt = 0; }
+    else if (btn(UP)) { cy--; mt = 0; } else if (btn(DOWN)) { cy++; mt = 0; }
+    cx = clamp(cx, 0, 19); cy = clamp(cy, 0, 13);
+  }
+  if (btnp(B)) { sel = 1 - sel; sfx(1); }
+  if (btnp(A)) {
+    var found = -1;
+    for (var i = 0; i < nt; i++) if (tx[i] == cx && ty[i] == cy) found = i;
+    if (found >= 0) {
+      var cost = 25 + tlv[found] * 15;
+      if (tlv[found] < 3 && gold >= cost) { gold -= cost; tlv[found]++; sfx(4); burst(cx * 8 + 4, 20 + cy * 8, 8, YELLOW); }
+      else sfx(6);
+    } else if (mget(m, 20, 14, cx, cy) == 0 && nt < 12 && gold >= 20 + sel * 5) {
+      gold -= 20 + sel * 5;
+      tx[nt] = cx; ty[nt] = cy; tlv[nt] = 0; tty[nt] = sel; tcd[nt] = 0; tsh[nt] = 0;
+      mset(m, 20, 14, cx, cy, sel == 0 ? 130 : 195);
+      nt++; sfx(4); burst(cx * 8 + 4, 20 + cy * 8, 10, CYAN);
+    } else sfx(6);
+  }
+  if (pause > 0) { pause--; if (pause == 0) startWave(); }
+  else if (spawnLeft > 0) {
+    spawnT--;
+    if (spawnT <= 0) { spawn(); spawnLeft--; spawnT = 28 - wave; if (spawnT < 10) spawnT = 10; }
+  }
+  var alive = 0;
+  for (var i = 0; i < 10; i++) {
+    if (ehp[i] > 0) {
+      alive++;
+      var sp = 6 + wave / 2;
+      if (esl[i] > 0) { esl[i]--; sp = sp / 2; }
+      var s = es[i];
+      var ddx = (wx[s] * 8 + 4) * 16 - ex[i];
+      var ddy = (wy[s] * 8 + 4) * 16 - ey[i];
+      if (abs(ddx) <= sp && abs(ddy) <= sp) { ex[i] += ddx; ey[i] += ddy; es[i]++; }
+      else if (ddx != 0) ex[i] += clamp(ddx, -sp, sp);
+      else ey[i] += clamp(ddy, -sp, sp);
+      if (es[i] >= 6) {
+        ehp[i] = 0; lives--; sfx(3); shake(200, 2); led(255, 0, 0, 200);
+        if (lives <= 0) { gameover("BASE LOST"); return 0; }
+      }
+    }
+  }
+  for (var t = 0; t < nt; t++) {
+    if (tcd[t] > 0) tcd[t]--;
+    if (tsh[t] > 0) tsh[t]--;
+    if (tcd[t] == 0) {
+      var best = -1; var bp = -1;
+      var rng = 30 + tlv[t] * 7;
+      for (var i = 0; i < 10; i++) {
+        if (ehp[i] > 0) {
+          var dx = (ex[i] >> 4) - (tx[t] * 8 + 4); var dy = (ey[i] >> 4) - (tx[t] * 0 + ty[t] * 8 + 4);
+          if (dx * dx + dy * dy <= rng * rng) {
+            var pg = es[i] * 100 - (abs((wx[es[i]] * 8 + 4) - (ex[i] >> 4)) + abs((wy[es[i]] * 8 + 4) - (ey[i] >> 4))) / 2;
+            if (pg > bp) { bp = pg; best = i; }
+          }
+        }
+      }
+      if (best >= 0) {
+        tsx[t] = ex[best] >> 4; tsy[t] = ey[best] >> 4; tsh[t] = 4;
+        if (tty[t] == 0) { ehp[best] -= 3 + tlv[t] * 2; tcd[t] = 22 - tlv[t] * 4; tone(400 + tlv[t] * 60, 8); }
+        else { ehp[best] -= 1 + tlv[t]; esl[best] = 60; tcd[t] = 14; tone(900, 6); }
+        if (ehp[best] <= 0) {
+          gold += 4 + wave / 2; kills++; addscore(10);
+          burst(ex[best] >> 4, ey[best] >> 4, 8, ORANGE); sfx(4);
+        }
+      }
+    }
+  }
+  if (pause == 0 && spawnLeft == 0 && alive == 0) {
+    addscore(30 * wave); gold += 15 + wave * 2; pause = 120; msg = 2; msgT = 80; sfx(2);
+  }
+  if (msgT > 0) msgT--;
+  cls(rgb(24, 90, 30));
+  drawmap(m, 20, 14, 0, 16);
+  spr(152, 16 + 10 * 8, 3, WHITE);
+  for (var t = 0; t < nt; t++) {
+    if (tsh[t] > 0) line(tx[t] * 8 + 4, 20 + ty[t] * 8, tsx[t], tsy[t] + 16, tty[t] == 0 ? YELLOW : CYAN);
+    for (var l = 0; l <= tlv[t]; l++) rect(tx[t] * 8 + l * 2, 16 + ty[t] * 8 + 6, 1, 2, WHITE);
+  }
+  for (var i = 0; i < 10; i++) {
+    if (ehp[i] > 0) {
+      var sx = ex[i] >> 4; var sy = (ey[i] >> 4) + 16;
+      disc(sx, sy, emax[i] > hpT[tier()] * 3 + wave * 9 ? 5 : 3, esl[i] > 0 ? CYAN : RED);
+      rect(sx - 4, sy - 7, 8, 2, DKGRAY);
+      rect(sx - 4, sy - 7, ehp[i] * 8 / emax[i] + 1, 2, LIME);
+    }
+  }
+  box(cx * 8, 16 + cy * 8, 8, 8, (flash & 4) ? WHITE : YELLOW);
+  rect(0, 0, 160, 16, NAVY);
+  text(2, 1, YELLOW, "$");
+  numw(10, 1, YELLOW, gold, 4);
+  text(2, 9, WHITE, "WAVE");
+  num(28, 9, LIME, wave);
+  text(48, 1, WHITE, "BASE");
+  numw(76, 1, lives < 4 ? RED : GREEN, lives, 2);
+  text(48, 9, WHITE, "SC");
+  numw(62, 9, CYAN, getscore(), 5);
+  text(100, 1, sel == 0 ? ORANGE : CYAN, sel == 0 ? "CANNON 20" : "FROST 25");
+  if (mget(m, 20, 14, cx, cy) > 129) text(100, 9, WHITE, "A: UPGRADE");
+  if (msgT > 0 && msg == 1) { ctext(60, WHITE, "WAVE"); num(100, 60, YELLOW, wave); }
+  if (msgT > 0 && msg == 2) ctext(60, LIME, "WAVE CLEARED");
+}
