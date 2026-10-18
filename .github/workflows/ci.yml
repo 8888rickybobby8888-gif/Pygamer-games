@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tools:
+    name: Tools and asset builders
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cartridges (compile and self-test)
+        run: python tools/make_carts.py
+      - name: Level packs (build and verify)
+        run: |
+          python tools/make_packs.py
+          python tools/verify_packs.py
+      - name: Portal levels
+        run: python tools/make_portal_pack.py
+      - name: Quest world
+        run: python tools/make_quest_world.py
+      - name: Word list and CHIP-8 ROMs
+        run: |
+          python tools/make_words.py
+          python tools/make_roms.py
+      - name: Game Maker self-test
+        run: node tools/creator/test_gamemaker.js
+      - name: Installer rejects a missing drive
+        run: |
+          if python tools/install_assets.py --packs --drive /nonexistent; then echo "expected failure"; exit 1; fi
+
+  firmware:
+    name: Firmware compile (PyGamer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Cache Arduino data
+        uses: actions/cache@v4
+        with:
+          path: ~/.arduino15
+          key: arduino-adafruit-samd-${{ hashFiles('sketch.yaml') }}
+      - name: Install board package and libraries
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://adafruit.github.io/arduino-board-index/package_adafruit_index.json
+          arduino-cli core update-index
+          arduino-cli core install adafruit:samd
+          arduino-cli lib install "Adafruit Arcada Library" "Adafruit TinyUSB Library" "Adafruit SPIFlash" "SdFat - Adafruit Fork"
+      - name: Compile
+        run: arduino-cli compile --fqbn adafruit:samd:adafruit_pygamer_m4:usbstack=tinyusb .
