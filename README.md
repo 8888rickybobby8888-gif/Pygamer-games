@@ -2,7 +2,6 @@
 
 A multi-game collection for the [Adafruit PyGamer](https://www.adafruit.com/product/4242) (SAMD51 / ATSAMD51J19). It started as a first-person portal puzzle game rendered with a grid raycaster and grew into **Arcadia**: a game picker with 64 built-in games plus expansion cartridges, a settings menu, high scores, achievements, and support for extra content loaded from the board's USB drive.
 
-> Status: the checklist says the current build has not been hand-tested on hardware yet. See [`TEST_CHECKLIST.md`](TEST_CHECKLIST.md).
 
 ## Features
 
