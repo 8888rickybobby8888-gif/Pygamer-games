@@ -42,6 +42,10 @@ arduino-cli upload -p <PyGamer port> --fqbn adafruit:samd:adafruit_pygamer_m4:us
 
 Double-tap reset if the board doesn't show up in `arduino-cli board list`.
 
+## Making your own games
+
+[`docs/HOW_TO_CODE_GAMES.md`](docs/HOW_TO_CODE_GAMES.md) explains the three ways to add a game: the no-code Game Maker, ARCL cartridges and built-in C++ games.
+
 ## Repository layout
 
 | Path | Purpose |
@@ -52,6 +56,7 @@ Double-tap reset if the board doesn't show up in `arduino-cli board list`.
 | `gen_levels.js` | Seeded generator for Portal levels. Run with `node gen_levels.js`. |
 | `gen_textures.js` | Bakes the raycaster textures into 16x16 bitmap tables. Run with `node gen_textures.js`. |
 | `level_editor.html`, `level_editor_server.js`, `launch_level_editor.bat` | Portal level editor. The local server splices levels into the sketch and drives `arduino-cli`. On Windows, run the `.bat`. Elsewhere, run `node level_editor_server.js` and open <http://localhost:8787>. |
+| `docs/HOW_TO_CODE_GAMES.md` | Guide to writing games |
 | `TEST_CHECKLIST.md` | Hardware test checklist |
 | `tools/` | Python asset builders, cartridge sources and creators (below) |
 
