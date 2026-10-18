@@ -84,3 +84,7 @@ The `tools/` folder has a detailed README for each part: `README_CARTS.txt`, `RE
 1. On the PyGamer, open **Settings → USB drive**. The drive appears on your PC.
 2. Run `python tools/install_assets.py` with the switch for what you built (`--carts`, `--packs`, `--portal`, `--quest`, `--words`, `--roms`, `--levels`, or none for banners). Add `--drive PATH` if auto-detection fails. On Windows, `powershell -ExecutionPolicy Bypass -File tools/install_assets.ps1` takes the same switches in PowerShell style (`-Carts`, `-Drive E:`).
 3. Eject the drive, then press **B** on the PyGamer. It reboots and picks up the new files.
+
+## License
+
+MIT, see [`LICENSE`](LICENSE). The vendored FatFs files (`ff.c`, `ff.h`, `ffconf.h`, `diskio.h`) keep their own licence.
