@@ -29838,6 +29838,7 @@ static void ch8Exec() {
           uint16_t nw = c.keys & ~c.prevKeys;
           if (!nw) { c.pc = pc; break; }   // keep waiting
           for (int k = 0; k < 16; k++) if ((nw >> k) & 1) { v[x] = (uint8_t)k; break; }
+          c.prevKeys = c.keys;   // consume the press: a second FX0A in the same frame must wait for a new one
           break;
         }
         case 0x15: c.dt = v[x]; break;
