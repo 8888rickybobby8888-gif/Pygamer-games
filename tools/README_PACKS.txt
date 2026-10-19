@@ -8,7 +8,7 @@ What it is
   Tank Duel) gets an extra row "Browse Packs" (hidden in 2 Player mode).
 
 Generate (PC, any OS with Python 3, no extra packages)
-  cd PyGamerPortal\tools
+  cd tools
   python make_packs.py        -> out\packs\g*.pak  (17 files, 322 levels, ~20 KB; deterministic, fixed seeds)
   python verify_packs.py      -> re-reads every file and prints a table (game, levels, bytes, OK/FAIL)
 

@@ -1,7 +1,7 @@
-# Arcadia hand-test checklist (54 games)
+# Arcadia hand-test checklist (64 games)
 
-This build is on the board (flashed 2026-10-11). Nothing in it has been tested on hardware yet, so
-start with the first section and work down. To reflash:
+This build was flashed on 2026-10-11 and has since been tested on hardware. The boxes below are left
+unticked for use as a re-test list after future changes; work from the first section down. To reflash:
 
     arduino-cli upload --fqbn adafruit:samd:adafruit_pygamer_m4 -p COMx .
 

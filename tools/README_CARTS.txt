@@ -118,7 +118,7 @@ THE CARTRIDGES (expansion list - none overlaps a built-in game)
 
 COLLISION GUARD (make_carts.py)
   Expansion carts must not duplicate a built-in game. On every build make_carts.py reads the built-in names from
-  ..\PyGamerPortal.ino (kGameNames table) plus toolsuiltin_games.txt (the same list, plus hand-added extras such
+  ../PyGamerPortal.ino (kGameNames table) plus toolsuiltin_games.txt (the same list, plus hand-added extras such
   as PONG, TETRIS, FROGGER). It FAILS the build ("BUILT-IN GAME COLLISION ... Pick a different, original game") when a
   cart's @name, compared case-insensitively with spaces/punctuation ignored, equals a built-in name or contains /
   is contained in one (4+ letters). A name that contains a genre keyword of a built-in game (lander, invader, breakout, brick, frogger, pong,
