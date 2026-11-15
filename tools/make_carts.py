@@ -995,52 +995,6 @@ def write_shot(path, out_dir, frames=240):
 
 
 
-# ----------------------------------------------------------------------------------------
-# collision guard: expansion carts must not duplicate a built-in game
-# ----------------------------------------------------------------------------------------
-GENRE_WORDS = ['lander', 'landing', 'invader', 'breakout', 'brick', 'brix', 'frogger', 'hopper', 'pong', 'snake',
-               'tetris', 'racer', 'racing', 'memory', 'pairs', 'pacman', 'asteroid', 'meteor', 'dodge', 'whack',
-               'mole', 'zap', 'runner', 'platform', 'minesweeper', 'simon', 'sokoban', 'reversi', 'checkers',
-               'chess', 'wordle', 'hangman', 'sudoku', 'plinko', 'slots', 'blaster', 'hockey', 'mastermind']
-
-
-def _norm(s):
-    return re.sub(r'[^a-z0-9]', '', s.lower())
-
-
-def builtin_names():
-    names = []
-    txt = os.path.join(HERE, 'builtin_games.txt')
-    if os.path.exists(txt):
-        names += [l.strip() for l in open(txt, encoding='utf8') if l.strip() and not l.startswith('#')]
-    ino = os.path.join(HERE, '..', 'PyGamerPortal.ino')
-    if os.path.exists(ino):
-        s = open(ino, encoding='utf8', errors='ignore').read()
-        i = s.find('kGameNames[NUM_GAMES] = {')
-        if i >= 0:
-            j = s.find('};', i)
-            names += re.findall(r'"([^"]+)"', s[i:j])
-    return sorted(set(names))
-
-
-def collision_check(name, blurb=''):
-    """Returns (errors, warnings) for a cart called `name`."""
-    errs, warns = [], []
-    n = _norm(name)
-    for b in builtin_names():
-        bn = _norm(b)
-        if not bn:
-            continue
-        if n == bn or (len(bn) >= 4 and bn in n) or (len(n) >= 4 and n in bn):
-            errs.append('name "%s" collides with built-in game "%s"' % (name, b))
-    for w in GENRE_WORDS:
-        if w in n:
-            errs.append('name "%s" uses genre keyword "%s" (a built-in game already covers that genre)' % (name, w))
-        elif w in _norm(blurb):
-            warns.append('blurb of "%s" mentions genre keyword "%s" (a built-in game covers it)' % (name, w))
-    return errs, warns
-
-
 def main(argv):
     args = [a for a in argv if not a.startswith('--')]
     flags = [a for a in argv if a.startswith('--')]
@@ -1053,11 +1007,6 @@ def main(argv):
             return 1
         for s in srcs:
             blob, meta, g = compile_file(s)
-            errs, warns = collision_check(meta['name'], meta.get('blurb', ''))
-            for w in warns:
-                print('WARNING:', os.path.basename(s), w)
-            if errs:
-                raise CompileError('%s: BUILT-IN GAME COLLISION: %s. Pick a different, original game.' % (os.path.basename(s), '; '.join(errs)))
             out = os.path.join(OUT_DIR, os.path.splitext(os.path.basename(s))[0] + '.arc')
             open(out, 'wb').write(blob)
             built.append(out)

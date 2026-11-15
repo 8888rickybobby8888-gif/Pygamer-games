@@ -81,7 +81,7 @@ func frame() {                     // runs 30 times a second
 - **Scoring:** `addscore(n)`, then `gameover("HEADLINE")` ends the round and records the score. Add `@lower` if a lower score is better.
 - **Sound and effects:** `sfx(0..7)`, `tone(hz, ms)`, `burst`, `shake`, `led`.
 - **Limits:** code 8 KB, strings 2 KB, 64 sprites, 1024 words of array memory, 30,000 opcodes per frame. The compiler enforces these.
-- **Name rule:** a cartridge can't duplicate a built-in game. The build fails with a collision error if it does.
+- **Names:** `make_carts.py` does not check cartridge names against the built-in games. The Game Maker page still has its own name check.
 
 ### Build, test and install
 

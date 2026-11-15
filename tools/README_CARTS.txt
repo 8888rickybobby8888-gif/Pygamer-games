@@ -11,7 +11,7 @@ Files in this folder
   arcvm_ref.py      reference interpreter = the specification of the VM (also used by the self-test)
   carts/*.arcl      the cartridge sources (11 games, see below) - read them, copy them, change them
   carts/retired/    old sources that duplicated built-in games (NOT compiled; kept for reference)
-  builtin_games.txt the built-in game names used by the collision guard (see below)
+  builtin_games.txt the built-in game names (used by the Game Maker page's name check)
   install_assets.ps1 -Carts   copies tools\out\carts\*.arc to <drive>:\carts\
 
 INSTALL
@@ -107,7 +107,7 @@ TESTING WITHOUT THE BOARD
 NOTE: text is transparent (no background box), so a cart must cls() or repaint the area behind
 HUD numbers every frame, or the digits stack on top of each other.
 
-THE CARTRIDGES (expansion list - none overlaps a built-in game)
+THE CARTRIDGES (the expansion list)
   LIGHT CYCLES  Tron duel vs the CPU on a grid     MINI GOLF     5 putting holes, fewest strokes
   BOULDER DIG   dig dirt, gems, falling rocks      BOMBER ARENA  bomb crates and the CPU
   PINBALL       flippers + bumpers + combos        BASE DEFENSE  build turrets, survive waves
@@ -116,13 +116,6 @@ THE CARTRIDGES (expansion list - none overlaps a built-in game)
   TINY DUNGEON  turn-based crawler
   The firmware lists at most 16 carts. Keep each cart under about 4.5 KB.
 
-COLLISION GUARD (make_carts.py)
-  Expansion carts must not duplicate a built-in game. On every build make_carts.py reads the built-in names from
-  ../PyGamerPortal.ino (kGameNames table) plus toolsuiltin_games.txt (the same list, plus hand-added extras such
-  as PONG, TETRIS, FROGGER). It FAILS the build ("BUILT-IN GAME COLLISION ... Pick a different, original game") when a
-  cart's @name, compared case-insensitively with spaces/punctuation ignored, equals a built-in name or contains /
-  is contained in one (4+ letters). A name that contains a genre keyword of a built-in game (lander, invader, breakout, brick, frogger, pong,
-  snake, tetris, racer, memory, pairs, meteor, dodge, whack, zap, runner, ...) also fails; a keyword only in the
-  blurb prints a WARNING. The keyword table is
-  GENRE_WORDS at the top of the guard section in make_carts.py. When you add a built-in game to the sketch, add its
-  name to builtin_games.txt (or just rebuild: the sketch is re-read every time).
+NAMES
+  make_carts.py does not check cart names against the built-in games: a cart may share a name or genre with one.
+  (The Game Maker page, creator/arcadia_gamemaker.html, still has its own name check; see README_GAMEMAKER.txt.)

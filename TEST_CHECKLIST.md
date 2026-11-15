@@ -167,7 +167,7 @@ Word list: build `python make_words.py` (tools), Settings > USB drive, `install_
 - [ ] Other games, saves and the Portal Quest data unchanged; Diagnostics free RAM about 2 KB lower
 
 ## Expansion cartridges (/carts/*.arc) and Retro CHIP-8 (game 63)
-Prep: `python tools\make_carts.py` (compiles + self-tests 11 carts; the collision guard rejects names that duplicate built-in games), `python tools\make_roms.py`; Settings > USB drive; `install_assets.ps1 -Carts -CleanCarts` (removes retired carts from the drive) then `-Roms`; eject; press B. See tools/README_CARTS.txt and README_CHIP8.txt.
+Prep: `python tools\make_carts.py` (compiles + self-tests 11 carts), `python tools\make_roms.py`; Settings > USB drive; `install_assets.ps1 -Carts -CleanCarts` (removes retired carts from the drive) then `-Roms`; eject; press B. See tools/README_CARTS.txt and README_CHIP8.txt.
 - [ ] Picker: the 11 carts (LIGHT CYCLES, MINI GOLF, BOULDER DIG, BOMBER ARENA, PINBALL, BASE DEFENSE, ARCHERY, FISHING, BOWLING, LIFE LAB, TINY DUNGEON) follow the built-in games in ALL (sorted by name, own icon/colour/blurb); Left cycles filters, the new last one "EXPANSIONS" lists only carts; category filters (ARCADE...) include carts with that blurb prefix; carts cannot be starred (Right does nothing); counter "i/N" counts them
 - [ ] No /carts folder or no carts: EXPANSIONS shows "No cartridges found" + install hint, nothing else changes; USB drive mode reboot rescans
 - [ ] Cart title: name/icon/3 help lines/tier name, Left/Right cycle the 4 tiers, "Best/Plays" line, A starts, B back; first launch does NOT open the built-in How to Play; Pause > How to Play shows the cart's own page (blurb, 3 lines, author, version)
